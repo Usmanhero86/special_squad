@@ -27,10 +27,20 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
   List<Member> _filteredMembers = [];
   final List<String> _locations = [
     'HQ',
-    'Abuja',
-    'Lagos',
-    'Kano',
-    'Port Harcourt',
+    'Marte',
+    'Baga',
+    'Sabon gari',
+    'Mallum fatori',
+    'Dikwa',
+    'Ngala',
+    'Mafa',
+    'Rann',
+    'Kala Balge',
+    'Gwoza',
+    'Askira',
+    'Biu',
+    'Damboa',
+    'Gamboru',
   ];
 
   final List<String> _paymentMethods = [
@@ -38,7 +48,12 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
     'Bank Transfer',
     'Mobile Money',
   ];
-  final List<String> _paymentPurposes = ['Salary', 'Allowance', 'Other'];
+  final List<String> _paymentPurposes = [
+    'Salary',
+    'Allowance',
+    'Membership Fee',
+    'Other',
+  ];
 
   @override
   void initState() {
