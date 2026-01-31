@@ -6,6 +6,7 @@ import './members/member_list_screen.dart';
 import './duty/duty_post_screen.dart';
 import './duty/duty_roster_screen.dart';
 import './payments/payment_history_screen.dart';
+import './profile/profile_screen.dart';
 import '../widgets/dashboard_card.dart';
 import '../widgets/theme_toggle_button.dart';
 import 'duty/assign_duty_screen.dart';
@@ -25,6 +26,14 @@ class DashboardScreen extends StatelessWidget {
             icon: const Icon(Icons.search),
             onPressed: () {},
             tooltip: 'Search',
+          ),
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+            ),
+            tooltip: 'Profile',
           ),
         ],
       ),
@@ -101,11 +110,14 @@ class DashboardScreen extends StatelessWidget {
             onTap: () => showReports(context),
           ),
           DashboardCard(
-            icon: Icons.settings,
-            title: 'Settings',
-            color: Colors.grey,
-            subtitle: 'App settings',
-            onTap: () => showSettings(context),
+            icon: Icons.person,
+            title: 'Profile',
+            color: Colors.deepPurple,
+            subtitle: 'View profile',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+            ),
           ),
         ],
       ),

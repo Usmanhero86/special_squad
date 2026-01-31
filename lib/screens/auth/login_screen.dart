@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../dashboard.dart';
+import 'package:special_squad/screens/main_dashboard.dart';
 import '../../widgets/theme_toggle_button.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -101,7 +101,7 @@ class LoginScreen extends StatelessWidget {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => DashboardScreen(),
+                                  builder: (context) => MainDashboard(),
                                 ),
                               );
                             },
