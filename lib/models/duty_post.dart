@@ -4,12 +4,7 @@ class DutyPost {
   String? description;
   String? location;
 
-  DutyPost({
-    required this.id,
-    required this.name,
-    this.description,
-    this.location,
-  });
+  DutyPost({required this.id, required this.name, this.description, this.location,});
 
   factory DutyPost.fromMap(Map<String, dynamic> data, String id) {
     return DutyPost(

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/payment.dart';
 import '../../models/member.dart';
+import '../../services/member_service.dart';
+import '../../services/payment_service.dart';
 
 class AddPaymentScreen extends StatefulWidget {
   const AddPaymentScreen({super.key});
 
   @override
-  _AddPaymentScreenState createState() => _AddPaymentScreenState();
+  AddPaymentScreenState createState() => AddPaymentScreenState();
 }
 
-class _AddPaymentScreenState extends State<AddPaymentScreen> {
+class AddPaymentScreenState extends State<AddPaymentScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _receiptController = TextEditingController();
@@ -17,21 +20,25 @@ class _AddPaymentScreenState extends State<AddPaymentScreen> {
 
   DateTime _selectedDate = DateTime.now();
   String _selectedMethod = 'Cash';
-  String _selectedPurpose = 'Membership Fee';
+  String _selectedPurpose = 'Salary';
   String? _selectedMemberId;
+  String? _selectedLocation;
   List<Member> _members = [];
+  List<Member> _filteredMembers = [];
+  final List<String> _locations = [
+    'HQ',
+    'Abuja',
+    'Lagos',
+    'Kano',
+    'Port Harcourt',
+  ];
 
   final List<String> _paymentMethods = [
     'Cash',
     'Bank Transfer',
     'Mobile Money',
   ];
-  final List<String> _paymentPurposes = [
-    'Membership Fee',
-    'Donation',
-    'Event Fee',
-    'Other',
-  ];
+  final List<String> _paymentPurposes = ['Salary', 'Allowance', 'Other'];
 
   @override
   void initState() {
@@ -39,39 +46,47 @@ class _AddPaymentScreenState extends State<AddPaymentScreen> {
     _loadMembers();
   }
 
-  void _loadMembers() {
-    // Load members from service
-    // This is placeholder - implement actual data loading
+  Future<void> _loadMembers() async {
+    final memberService = Provider.of<MemberService>(context, listen: false);
+    try {
+      final members = await memberService.getMembersSync();
+      if (mounted) {
+        setState(() {
+          _members = members;
+          _filteredMembers = members;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading members: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _filterMembersByLocation(String? location) {
     setState(() {
-      _members = [
-        Member(
-          id: '1',
-          fullName: 'John Doe',
-          idNumber: 'ID001234567',
-          phone: '1234567890',
-          dateOfBirth: DateTime(1990, 1, 1),
-          address: '123 Main St',
-          position: 'Member',
-          joinDate: DateTime.now(),
-        ),
-        Member(
-          id: '2',
-          fullName: 'Jane Smith',
-          idNumber: 'ID009876543',
-          phone: '0987654321',
-          dateOfBirth: DateTime(1992, 2, 2),
-          address: '456 Oak Ave',
-          position: 'Manager',
-          joinDate: DateTime.now(),
-        ),
-      ];
+      _selectedLocation = location;
+      _selectedMemberId = null; // Reset selected member when location changes
+
+      if (location == null || location.isEmpty) {
+        _filteredMembers = _members;
+      } else {
+        _filteredMembers = _members
+            .where((member) => member.location == location)
+            .toList();
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Record Payment')),
+      appBar: AppBar(title: const Text('Record Payment')),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Form(
@@ -79,6 +94,8 @@ class _AddPaymentScreenState extends State<AddPaymentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _buildLocationSelector(),
+              SizedBox(height: 20),
               _buildMemberSelector(),
               SizedBox(height: 20),
               _buildAmountField(),
@@ -107,6 +124,42 @@ class _AddPaymentScreenState extends State<AddPaymentScreen> {
     );
   }
 
+  Widget _buildLocationSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Location *',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedLocation,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please select a location';
+            }
+            return null;
+          },
+          hint: Text('Select location first'),
+          items: _locations
+              .map(
+                (location) =>
+                    DropdownMenuItem(value: location, child: Text(location)),
+              )
+              .toList(),
+          onChanged: (value) {
+            _filterMembersByLocation(value);
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildMemberSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,21 +181,79 @@ class _AddPaymentScreenState extends State<AddPaymentScreen> {
             }
             return null;
           },
-          hint: Text('Select a member'),
-          items: _members
+          hint: Text(
+            _selectedLocation == null
+                ? 'Select location first'
+                : _filteredMembers.isEmpty
+                ? 'No members in $_selectedLocation'
+                : 'Select a member from $_selectedLocation',
+          ),
+          items: _filteredMembers
               .map(
                 (member) => DropdownMenuItem(
                   value: member.id,
-                  child: Text(member.fullName),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1),
+                        backgroundImage: member.profileImage != null
+                            ? FileImage(member.profileImage as dynamic)
+                            : null,
+                        child: member.profileImage == null
+                            ? Text(
+                                member.fullName.substring(0, 1).toUpperCase(),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              )
+                            : null,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              member.fullName,
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              member.location ?? 'No location',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
               .toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedMemberId = value;
-            });
-          },
+          onChanged: _selectedLocation == null
+              ? null
+              : (value) {
+                  setState(() {
+                    _selectedMemberId = value;
+                  });
+                },
         ),
+        if (_selectedLocation != null && _filteredMembers.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '${_filteredMembers.length} member(s) in $_selectedLocation',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ),
       ],
     );
   }
@@ -328,8 +439,23 @@ class _AddPaymentScreenState extends State<AddPaymentScreen> {
     }
   }
 
-  void _savePayment() {
+  Future<void> _savePayment() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedLocation == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a location first'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final paymentService = Provider.of<PaymentService>(
+        context,
+        listen: false,
+      );
+
       final payment = Payment(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         memberId: _selectedMemberId!,
@@ -344,17 +470,30 @@ class _AddPaymentScreenState extends State<AddPaymentScreen> {
         status: 'Completed',
       );
 
-      // Save payment to database (implement this)
-      print('Payment saved: $payment');
+      try {
+        await paymentService.addPayment(payment, null);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Payment recorded successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      Navigator.pop(context);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Payment recorded successfully for $_selectedLocation',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving payment: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 }

@@ -147,10 +147,7 @@ class DutyService {
     }
   }
 
-  Future<List<DutyRoster>> getDutyRostersByDateRange(
-    DateTime startDate,
-    DateTime endDate,
-  ) async {
+  Future<List<DutyRoster>> getDutyRostersByDateRange(DateTime startDate, DateTime endDate,) async {
     try {
       final db = await _dbHelper.database;
       final List<Map<String, dynamic>> maps = await db.query(
@@ -251,4 +248,5 @@ class DutyService {
       notes: map['notes'],
     );
   }
+
 }

@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Ignore Gradle project-specific cache directory
+.gradle
+
+# Ignore Gradle build output directory
+build
+
+# Ignore large Gradle wrapper files
+android/gradle/wrapper/gradle-*.zip
+android/gradle/wrapper/gradle-*-all.zip

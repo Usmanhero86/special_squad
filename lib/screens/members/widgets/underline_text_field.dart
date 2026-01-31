@@ -8,11 +8,11 @@ class UnderlineTextField extends StatelessWidget {
   final TextInputType keyboardType;
   final int? maxLines;
   final Function(String)? onChanged;
-  final String? Function(String?)? validator;
   final bool obscureText;
   final Widget? suffixIcon;
   final double? labelWidth;
   final double? spacing;
+  // final FocusNode? focusNode;
 
   const UnderlineTextField({
     super.key,
@@ -23,11 +23,11 @@ class UnderlineTextField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.maxLines = 1,
     this.onChanged,
-    this.validator,
     this.obscureText = false,
     this.suffixIcon,
     this.labelWidth,
     this.spacing,
+    // this.focusNode,
   });
 
   @override
@@ -36,66 +36,62 @@ class UnderlineTextField extends StatelessWidget {
     final isTablet = screenWidth > 600;
     final isDesktop = screenWidth > 1200;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Label text
-        SizedBox(
-          width: labelWidth ?? (isTablet ? 120 : 80),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: Colors.black,
-              fontSize: isDesktop ? 16 : (isTablet ? 15 : 14),
+        Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+                fontSize: isDesktop ? 16 : (isTablet ? 15 : 14),
+              ),
             ),
-          ),
+            if (requiredField)
+              const Text(
+                ' *',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+          ],
         ),
-        SizedBox(width: spacing ?? (isTablet ? 10 : 8)),
-        // Text field
-        Expanded(
-          child: TextFormField(
-            controller: controller,
-            style: TextStyle(
-              fontSize: isDesktop ? 19 : (isTablet ? 16 : 15),
+        SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          // focusNode: focusNode,
+          style: TextStyle(
+    color: Colors.black,
+            fontSize: isDesktop ? 19 : (isTablet ? 16 : 15),
+          ),
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          enabled: enabled,
+          obscureText: obscureText,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            fillColor: Colors.black,
+            focusColor: Colors.black,
+            hoverColor: Colors.black,
+            isDense: true,
+            suffixIcon: suffixIcon,
+            contentPadding: EdgeInsets.only(
+              left: 8,
+              bottom: isTablet ? 12 : 8,
+              top: isTablet ? 12 : 8,
             ),
-            keyboardType: keyboardType,
-            maxLines: maxLines,
-            enabled: enabled,
-            obscureText: obscureText,
-            onChanged: onChanged,
-            decoration: InputDecoration(
-              isDense: true,
-              suffixIcon: suffixIcon,
-              contentPadding: EdgeInsets.only(
-                left: 8,
-                bottom: isTablet ? 12 : 8,
-                top: isTablet ? 12 : 8,
-              ),
-              border: const UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.black, width: 0.5),
-              ),
-              enabledBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.black, width: 0.5),
-              ),
-              focusedBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.blue, width: 0.5),
-              ),
-              errorBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.red, width: 0.5),
-              ),
-              focusedErrorBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.red, width: 0.5),
-              ),
+            border: const OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.black, width: 0.5),
             ),
-            validator: validator ?? (requiredField
-                ? (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'This field is required';
-              }
-              return null;
-            }
-                : null),
+            enabledBorder: const OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.black, width: 0.5),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blue, width: 0.5),
+            ),
           ),
         ),
       ],

@@ -9,6 +9,9 @@ class PaymentService {
 
   Future<void> addPayment(Payment payment, File? attachment) async {
     try {
+      // Ensure payments table exists
+      await _dbHelper.createPaymentsTableIfNotExists();
+
       String? attachmentUrl;
 
       if (attachment != null) {
@@ -221,6 +224,9 @@ class PaymentService {
 
   Future<List<Payment>> getRecentPayments({int limit = 10}) async {
     try {
+      // Ensure payments table exists
+      await _dbHelper.createPaymentsTableIfNotExists();
+
       final db = await _dbHelper.database;
       final List<Map<String, dynamic>> maps = await db.query(
         'payments',

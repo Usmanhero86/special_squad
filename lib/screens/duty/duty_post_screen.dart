@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/duty_post.dart';
+import '../../models/member.dart';
 import '../../services/duty_service.dart';
+import '../../services/member_service.dart';
+import '../../widgets/duty_post_card.dart';
+import '../../widgets/member_location_card.dart';
 import 'assign_duty_screen.dart';
 
 class DutyPostScreen extends StatefulWidget {
@@ -14,20 +18,29 @@ class DutyPostScreen extends StatefulWidget {
 class _DutyPostScreenState extends State<DutyPostScreen> {
   List<DutyPost> _dutyPosts = [];
   bool _isLoading = true;
+  List<Member> _membersByLocation = [];
+  List<String> _locations = [];
+  String? _selectedLocation;
+  int _selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadDutyPosts();
+    _loadData();
   }
 
-  Future<void> _loadDutyPosts() async {
+  Future<void> _loadData() async {
     final dutyService = Provider.of<DutyService>(context, listen: false);
+    final memberService = Provider.of<MemberService>(context, listen: false);
+
     try {
-      final posts = await dutyService.getDutyPosts();
+      final List<DutyPost> posts = await dutyService.getDutyPosts();
+      final List<String> locations = await memberService.getMemberLocations();
+
       if (mounted) {
         setState(() {
           _dutyPosts = posts;
+          _locations = locations;
           _isLoading = false;
         });
       }
@@ -36,122 +49,188 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load duty posts: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
       }
+    }
+  }
+
+  Future<void> loadMembersByLocation(String location) async {
+    final memberService = Provider.of<MemberService>(context, listen: false);
+    try {
+      final members = await memberService.getMembersByLocation(location);
+      if (mounted) {
+        setState(() {
+          _membersByLocation = members;
+          _selectedLocation = location;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load members: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Duty Posts'),
-        actions: [IconButton(icon: Icon(Icons.add), onPressed: _addDutyPost)],
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _dutyPosts.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Duty Posts'),
+          bottom: TabBar(
+            onTap: (index) {
+              setState(() {
+                _selectedTab = index;
+              });
+            },
+            tabs: [
+              Tab(text: 'Duty Posts'),
+              Tab(text: 'Members by Location'),
+            ],
+          ),
+        ),
+        body: _isLoading
+            ? Center(child: CircularProgressIndicator())
+            : TabBarView(
                 children: [
-                  Icon(Icons.work_off, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'No duty posts available',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: _addDutyPost,
-                    child: Text('Add First Duty Post'),
-                  ),
+                  // Tab 1: Duty Posts
+                  dutyPostsTab(),
+
+                  // Tab 2: Members by Location
+                  membersByLocationTab(),
                 ],
               ),
-            )
-          : ListView.builder(
-              itemCount: _dutyPosts.length,
-              itemBuilder: (context, index) {
-                final post = _dutyPosts[index];
-                return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: ListTile(
-                    onTap: () => _showDutyPostDetails(post),
-                    leading: Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.place, color: Colors.blue),
-                    ),
-                    title: Text(
-                      post.name,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: 2),
-                        if (post.location != null && post.location!.isNotEmpty)
-                          Text(post.location!),
-                        if (post.description != null &&
-                            post.description!.isNotEmpty)
-                          Text(
-                            post.description!,
-                            style: TextStyle(fontSize: 12),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                    ),
-                    trailing: PopupMenuButton(
-                      onSelected: (value) {
-                        if (value == 'edit') {
-                          _editDutyPost(post);
-                        } else if (value == 'delete') {
-                          _deleteDutyPost(post);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit, size: 20),
-                              SizedBox(width: 8),
-                              Text('Edit'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, size: 20, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text(
-                                'Delete',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+      ),
     );
   }
 
-  void _addDutyPost() {
+  // Keep as method - depends on state
+  Widget dutyPostsTab() {
+    return _dutyPosts.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.work_off, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'No duty posts available',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+                SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: addDutyPost,
+                  child: Text('Add First Duty Post'),
+                ),
+              ],
+            ),
+          )
+        : ListView.builder(
+            itemCount: _dutyPosts.length,
+            itemBuilder: (context, index) {
+              final post = _dutyPosts[index];
+              return DutyPostCard(
+                post: post,
+                onTap: () => showDutyPostDetails(post),
+                onEdit: () => editDutyPost(post),
+                onDelete: () => deleteDutyPost(post),
+              );
+            },
+          );
+  }
+
+  // Keep as method - depends on state
+  Widget membersByLocationTab() {
+    return Column(
+      children: [
+        // Location Filter
+        Padding(
+          padding: EdgeInsets.all(16),
+          child: DropdownButtonFormField<String>(
+            initialValue: _selectedLocation,
+            decoration: InputDecoration(
+              labelText: 'Select Location',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.location_on),
+            ),
+            items: [
+              DropdownMenuItem(value: null, child: Text('All Locations')),
+              ..._locations.map((location) {
+                return DropdownMenuItem(value: location, child: Text(location));
+              }),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                loadMembersByLocation(value);
+              } else {
+                setState(() {
+                  _selectedLocation = null;
+                  _membersByLocation = [];
+                });
+              }
+            },
+          ),
+        ),
+
+        // Members List
+        Expanded(
+          child: _selectedLocation == null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.location_on, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'Select a location to view members',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                )
+              : _membersByLocation.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.people, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'No members found for $_selectedLocation',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _membersByLocation.length,
+                  itemBuilder: (context, index) {
+                    final member = _membersByLocation[index];
+                    return MemberLocationCard(
+                      member: member,
+                      onAssignDuty: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AssignDutyScreen(
+                              dutyPostId: null,
+                              preSelectedMemberId: member.id,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  void addDutyPost() {
     final nameController = TextEditingController();
     final locationController = TextEditingController();
     final descriptionController = TextEditingController();
@@ -223,7 +302,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     try {
       await dutyService.addDutyPost(newPost);
       Navigator.pop(context);
-      _loadDutyPosts(); // Refresh the list
+      _loadData(); // Refresh the list
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Duty post added successfully')));
@@ -234,7 +313,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     }
   }
 
-  void _editDutyPost(DutyPost post) {
+  void editDutyPost(DutyPost post) {
     final nameController = TextEditingController(text: post.name);
     final locationController = TextEditingController(text: post.location ?? '');
     final descriptionController = TextEditingController(
@@ -273,7 +352,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
             child: Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => _updateDutyPost(
+            onPressed: () => updateDutyPost(
               post,
               nameController.text,
               locationController.text,
@@ -286,7 +365,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     );
   }
 
-  Future<void> _updateDutyPost(
+  Future<void> updateDutyPost(
     DutyPost post,
     String name,
     String location,
@@ -309,7 +388,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     try {
       await dutyService.updateDutyPost(updatedPost);
       Navigator.pop(context);
-      _loadDutyPosts(); // Refresh the list
+      _loadData(); // Refresh the list
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Duty post updated successfully')));
@@ -320,7 +399,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     }
   }
 
-  void _deleteDutyPost(DutyPost post) {
+  void deleteDutyPost(DutyPost post) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -332,7 +411,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
             child: Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => _confirmDeleteDutyPost(post),
+            onPressed: () => confirmDeleteDutyPost(post),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: Text('Delete'),
           ),
@@ -341,13 +420,13 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     );
   }
 
-  Future<void> _confirmDeleteDutyPost(DutyPost post) async {
+  Future<void> confirmDeleteDutyPost(DutyPost post) async {
     final dutyService = Provider.of<DutyService>(context, listen: false);
 
     try {
       await dutyService.deleteDutyPost(post.id);
       Navigator.pop(context);
-      _loadDutyPosts(); // Refresh the list
+      _loadData(); // Refresh the list
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Duty post deleted successfully')));
@@ -358,7 +437,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     }
   }
 
-  void _showDutyPostDetails(DutyPost post) {
+  void showDutyPostDetails(DutyPost post) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -397,7 +476,6 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    // Navigate to assign duty screen
                     Navigator.pop(context);
                     Navigator.push(
                       context,

@@ -1,16 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:special_squad/screens/members/sections/contact_info_section.dart';
-import 'package:special_squad/screens/members/sections/emergency_section.dart';
-import 'package:special_squad/screens/members/sections/form_subtitle.dart';
-import 'package:special_squad/screens/members/sections/guarantor_section.dart';
-import 'package:special_squad/screens/members/sections/membership_header.dart';
-import 'package:special_squad/screens/members/sections/next_of_kin_section.dart';
-import 'package:special_squad/screens/members/sections/save_form_button.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:special_squad/screens/members/sections/section_title.dart';
-import 'package:special_squad/screens/members/sections/signature_section.dart';
-import '../../models/member.dart';
-import '../../services/member_service.dart';
+import 'guarantor_infoo.dart';
 
 class AddMemberScreen extends StatefulWidget {
   const AddMemberScreen({super.key});
@@ -20,280 +12,621 @@ class AddMemberScreen extends StatefulWidget {
 }
 
 class _AddMemberScreenState extends State<AddMemberScreen> {
-  final _formKey = GlobalKey<FormState>();
+  // Form controllers
+  final TextEditingController fullNameController = TextEditingController();
+  final TextEditingController idNoController = TextEditingController();
+  final TextEditingController rifleNoController = TextEditingController();
+  final TextEditingController tribeController = TextEditingController();
+  final TextEditingController religionController = TextEditingController();
+  final TextEditingController dobController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController locationController = TextEditingController();
+  final TextEditingController addressController = TextEditingController();
+  final TextEditingController maritalController = TextEditingController();
+  final TextEditingController positionController = TextEditingController();
+  final TextEditingController ninController = TextEditingController();
+  final TextEditingController stateController = TextEditingController();
+  final TextEditingController accountController = TextEditingController();
+  final TextEditingController unitAreaController = TextEditingController();
 
-  // Contact Information
-  final TextEditingController _rifleNoController = TextEditingController();
-  final TextEditingController _idNoController = TextEditingController();
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _tribeController = TextEditingController();
-  final TextEditingController _religionController = TextEditingController();
-  final TextEditingController _permanentAddressController = TextEditingController();
-  final TextEditingController _phoneNoController = TextEditingController();
-  final TextEditingController _maritalStatusController = TextEditingController();
-  final TextEditingController _positionController = TextEditingController();
-  final TextEditingController _ninNoController = TextEditingController();
-  final TextEditingController _bvnController = TextEditingController();
-  final TextEditingController _accountNoController = TextEditingController();
-  final TextEditingController _lgaController = TextEditingController();
-  final TextEditingController _stateController = TextEditingController();
-  final TextEditingController _unitAreaController = TextEditingController();
+  // Selected values
+  String? selectedGender;
+  String? selectedUnitAreaType;
 
-  // Guarantor's Information
-  final TextEditingController _guarantorFullNameController =
-      TextEditingController();
-  final TextEditingController _guarantorAddressController =
-      TextEditingController();
-  final TextEditingController _guarantorPhoneController =
-      TextEditingController();
-  final TextEditingController _guarantorRelationshipController =
-      TextEditingController();
-
-  // Emergency Contact Information
-  final TextEditingController _emergencyFullNameController =
-      TextEditingController();
-  final TextEditingController _emergencyAddressController =
-      TextEditingController();
-  final TextEditingController _emergencyPhoneController =
-      TextEditingController();
-
-  // Next of Kin
-  final TextEditingController _nextOfKinFullNameController =
-      TextEditingController();
-  final TextEditingController _nextOfKinAddressController =
-      TextEditingController();
-  final TextEditingController _nextOfKinPhoneController =
-      TextEditingController();
-
-  final DateTime _dateOfBirth = DateTime.now();
-  final String _gender = '';
-  final String _accountType = 'Salary Acct';
-
-  // Unit Area checkboxes
-  final bool _boyesBatchA = false;
-  final bool _boyesBatchB = false;
-  final bool _neighborhoodWatch = false;
-  final bool _hybridForce = false;
-  final bool _volunteer = false;
-
-
-  Future<void> _saveMember() async {
-    if (_formKey.currentState!.validate()) {
-      final memberService = Provider.of<MemberService>(context, listen: false);
-
-      // Create comprehensive member data
-      final additionalInfo = {
-        'rifleNo': _rifleNoController.text.trim(),
-        'gender': _gender,
-        'tribe': _tribeController.text.trim(),
-        'religion': _religionController.text.trim(),
-        'maritalStatus': _maritalStatusController.text.trim(),
-        'ninNo': _ninNoController.text.trim(),
-        'bvn': _bvnController.text.trim(),
-        'accountNo': _accountNoController.text.trim(),
-        'accountType': _accountType,
-        'lga': _lgaController.text.trim(),
-        'state': _stateController.text.trim(),
-        'unitArea': _unitAreaController.text.trim(),
-        'boyesBatchA': _boyesBatchA,
-        'boyesBatchB': _boyesBatchB,
-        'neighborhoodWatch': _neighborhoodWatch,
-        'hybridForce': _hybridForce,
-        'volunteer': _volunteer,
-        'guarantor': {
-          'fullName': _guarantorFullNameController.text.trim(),
-          'address': _guarantorAddressController.text.trim(),
-          'phone': _guarantorPhoneController.text.trim(),
-          'relationship': _guarantorRelationshipController.text.trim(),
-        },
-        'emergencyContact': {
-          'fullName': _emergencyFullNameController.text.trim(),
-          'address': _emergencyAddressController.text.trim(),
-          'phone': _emergencyPhoneController.text.trim(),
-        },
-        'nextOfKin': {
-          'fullName': _nextOfKinFullNameController.text.trim(),
-          'address': _nextOfKinAddressController.text.trim(),
-          'phone': _nextOfKinPhoneController.text.trim(),
-        },
-      };
-
-      final member = Member(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        fullName: _fullNameController.text.trim(),
-        idNumber: _idNoController.text.trim().isEmpty
-            ? DateTime.now().millisecondsSinceEpoch.toString()
-            : _idNoController.text.trim(),
-        phone: _phoneNoController.text.trim(),
-        dateOfBirth: _dateOfBirth,
-        address: _permanentAddressController.text.trim(),
-        position: _positionController.text.trim().isEmpty
-            ? 'Member'
-            : _positionController.text.trim(),
-        joinDate: DateTime.now(),
-        additionalInfo: additionalInfo,
-      );
-
-      try {
-        await memberService.addMember(member, null);
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Member "${member.fullName}" registered successfully!',
-              ),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error registering member: $e'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    // Dispose all controllers
-    _rifleNoController.dispose();
-    _idNoController.dispose();
-    _fullNameController.dispose();
-    _tribeController.dispose();
-    _religionController.dispose();
-    _permanentAddressController.dispose();
-    _phoneNoController.dispose();
-    _maritalStatusController.dispose();
-    _positionController.dispose();
-    _ninNoController.dispose();
-    _bvnController.dispose();
-    _accountNoController.dispose();
-    _lgaController.dispose();
-    _stateController.dispose();
-    _unitAreaController.dispose();
-    _guarantorFullNameController.dispose();
-    _guarantorAddressController.dispose();
-    _guarantorPhoneController.dispose();
-    _guarantorRelationshipController.dispose();
-    _emergencyFullNameController.dispose();
-    _emergencyAddressController.dispose();
-    _emergencyPhoneController.dispose();
-    _nextOfKinFullNameController.dispose();
-    _nextOfKinAddressController.dispose();
-    _nextOfKinPhoneController.dispose();
-    super.dispose();
-  }
+  // Profile image
+  File? _profileImage;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth > 600;
-    final isDesktop = screenWidth > 1200;
-
-    // Responsive margins and padding
-    final containerPadding = isDesktop ? 40.0 : (isTablet ? 30.0 : 20.0);
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      // appBar: AppBar(
-      //   backgroundColor: Colors.white,
-      //   elevation: 0,
-      //   leading: IconButton(
-      //     icon: Icon(Icons.arrow_back, color: Colors.black),
-      //     onPressed: () => Navigator.pop(context),
-      //   ),
-      //   title: Text(
-      //     'Membership Data Form',
-      //     style: TextStyle(
-      //       color: Colors.black,
-      //       fontWeight: FontWeight.bold,
-      //       fontSize: isTablet ? 20 : 18,
-      //     ),
-      //   ),
-      // ),
+      appBar: AppBar(
+        title: const Text(
+          'Register Member',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
-        child: Center(
-          child: SafeArea(
-            child: Container(
-              // constraints: BoxConstraints(
-              //   maxWidth: isDesktop ? 800 : double.infinity,
-              // ),
-              // margin: EdgeInsets.symmetric(
-              //   horizontal: horizontalMargin,
-              //   vertical: 16,
-              // ),
-              padding: EdgeInsets.all(containerPadding),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  // mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    MembershipHeader(),
-                    SizedBox(height: isTablet ? 30 : 20),
-            
-                    // Contact Information Section
-                    SectionTitle(title: 'Contact Information'),                  SizedBox(height: 15),
-                    ContactInformationForm(),
-                    SizedBox(height: isTablet ? 30 : 20),
-            
-                    // Guarantor's Information Section
-                    SectionTitle(title: "Guarantor's Information" ),
-                    FormSubtitle(
-                      text: 'Note: Enter the Contact Information of your Guarantor below.',
-                    ),
-                    SizedBox(height: 10),
-                    GuarantorInformation(guarantorFullNameController: _guarantorFullNameController, guarantorAddressController: _guarantorAddressController, guarantorPhoneController: _guarantorPhoneController, guarantorRelationshipController: _guarantorRelationshipController),
-                    SizedBox(height: isTablet ? 30 : 20),
-            
-                    // Emergency Contact Information Section
-                    SectionTitle(title: 'Emergency Contact Information'),
-                    SizedBox(height: 10),
-                    EmergencyContactInformation(
-                      emergencyFullnameController: _emergencyFullNameController,
-                      emergencyAddressController: _emergencyAddressController,
-                      emergencyPhoneController: _emergencyPhoneController,
-                    ),
-                    SizedBox(height: isTablet ? 30 : 20),
-            
-                    // Next of Kin Section
-                    SectionTitle(title: 'Next of Kin'),
-                    SizedBox(height: 10),
-                    NextOfKinInformation(
-                      nextOfKinFullnameController: _nextOfKinFullNameController,
-                      nextOfKinAddressController: _nextOfKinAddressController,
-                      nextOfKinPhoneController: _nextOfKinPhoneController,
-                    ),
-                    SizedBox(height: isTablet ? 40 : 30),
-            
-                    // Signature Section
-                    SignatureSection(),
-                    SizedBox(height: isTablet ? 40 : 30),
-            
-                    // Save Button
-                    SaveFormButton(onPressed: _saveMember),
-                  ],
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Profile Picture Section
+            _buildProfilePictureSection(),
+            const SizedBox(height: 24),
+
+          Align(
+            alignment: Alignment.center,
+            child: SectionTitle(title: 'Membership Data Form')),
+            const SizedBox(height: 24),
+            SectionTitle(title: 'Contact Info',),
+
+            // Form Fields
+            _buildFormSection(),
+
+            // Next Button
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _navigateToGuarantorInfo,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
+                child: const Text(
+                  'Next',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
   }
 
+  Widget _buildFormSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Personal Information Grid
+        _buildPersonalInfoGrid(),
+
+        const SizedBox(height: 16),
+
+        // Phone Number Section
+        _buildLabel('Phone Number'),
+        const SizedBox(height: 4),
+        TextFormField(
+          controller: phoneController,
+          decoration: InputDecoration(
+            hintText: 'Enter phone number',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4.0),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 16,
+            ),
+          ),
+          keyboardType: TextInputType.phone,
+        ),
+
+        const SizedBox(height: 16),
+
+        // Location Section
+        _buildLabel('Location'),
+        const SizedBox(height: 4),
+        TextFormField(
+          controller: locationController,
+          decoration: InputDecoration(
+            hintText: 'Enter location',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4.0),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 16,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Gender Section
+        _buildLabel('Gender'),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _buildRadioButton('Male', 'male'),
+            const SizedBox(width: 24),
+            _buildRadioButton('Female', 'female'),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Permanent Address
+        _buildLabel('Permanent Address'),
+        const SizedBox(height: 4),
+        TextFormField(
+          controller: addressController,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Enter permanent address',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4.0),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Other Information Grid
+        _buildOtherInfoGrid(),
+
+        const SizedBox(height: 16),
+
+        // Unit Area Type Section
+        _buildLabel('Unit Area Type'),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildCheckboxOption('Boyce Batch A'),
+            _buildCheckboxOption('Boyce Batch B'),
+            _buildCheckboxOption('Neighbourhood Watch'),
+            _buildCheckboxOption('Hybrid Force'),
+            _buildCheckboxOption('Volunteer'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPersonalInfoGrid() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Full Name'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: fullNameController,
+                    decoration: _inputDecoration('Enter full name'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('ID No'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: idNoController,
+                    decoration: _inputDecoration('Enter ID number'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Rifle No'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: rifleNoController,
+                    decoration: _inputDecoration('Enter rifle number'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Tribe'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: tribeController,
+                    decoration: _inputDecoration('Enter tribe'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Religion'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: religionController,
+                    decoration: _inputDecoration('Enter religion'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Date of Birth'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: dobController,
+                    decoration: _inputDecoration('DD/MM/YYYY'),
+                    readOnly: true,
+                    onTap: () {
+                      _selectDate(context);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOtherInfoGrid() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Marital Status'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: maritalController,
+                    decoration: _inputDecoration('Enter marital status'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Position'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: positionController,
+                    decoration: _inputDecoration('Enter position'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('NIN No'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: ninController,
+                    decoration: _inputDecoration('Enter NIN number'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('State'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: stateController,
+                    decoration: _inputDecoration('Enter state'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Account No'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: accountController,
+                    decoration: _inputDecoration('Enter account number'),
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Unit Area'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: unitAreaController,
+                    decoration: _inputDecoration('Enter unit area'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hintText) {
+    return InputDecoration(
+      hintText: hintText,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(4.0),
+        borderSide: const BorderSide(color: Colors.grey),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+    );
+  }
+
+  Widget _buildRadioButton(String label, String value) {
+    return Row(
+      children: [
+        Radio<String>(
+          value: value,
+          groupValue: selectedGender,
+          onChanged: (String? value) {
+            setState(() {
+              selectedGender = value;
+            });
+          },
+        ),
+        Text(label, style: const TextStyle(fontSize: 14)),
+      ],
+    );
+  }
+
+  Widget _buildCheckboxOption(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Checkbox(
+            value: selectedUnitAreaType == label.toLowerCase(),
+            onChanged: (bool? value) {
+              setState(() {
+                if (value == true) {
+                  selectedUnitAreaType = label.toLowerCase();
+                } else {
+                  selectedUnitAreaType = null;
+                }
+              });
+            },
+          ),
+          Text(label, style: const TextStyle(fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        dobController.text =
+            "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
+      });
+    }
+  }
+
+  // Profile Picture Section
+  Widget _buildProfilePictureSection() {
+    return Center(
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: _pickProfileImage,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 3,
+                ),
+                color: Theme.of(context).colorScheme.surface,
+              ),
+              child: _profileImage != null
+                  ? ClipOval(
+                      child: Image.file(
+                        _profileImage!,
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.camera_alt,
+                          size: 40,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Add Photo',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Tap to add profile picture',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Pick profile image
+  Future<void> _pickProfileImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 500,
+        maxHeight: 500,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        setState(() {
+          _profileImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Navigate to Guarantor Info with member data
+  void _navigateToGuarantorInfo() {
+    // Validate required fields
+    if (fullNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter full name'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (phoneController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter phone number'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Create member data map to pass to next screen
+    final memberData = {
+      'fullName': fullNameController.text.trim(),
+      'idNo': idNoController.text.trim(),
+      'rifleNo': rifleNoController.text.trim(),
+      'tribe': tribeController.text.trim(),
+      'religion': religionController.text.trim(),
+      'dateOfBirth': dobController.text.trim(),
+      'phone': phoneController.text.trim(),
+      'location': locationController.text.trim(),
+      'address': addressController.text.trim(),
+      'maritalStatus': maritalController.text.trim(),
+      'position': positionController.text.trim(),
+      'ninNo': ninController.text.trim(),
+      'state': stateController.text.trim(),
+      'accountNo': accountController.text.trim(),
+      'unitArea': unitAreaController.text.trim(),
+      'gender': selectedGender,
+      'unitAreaType': selectedUnitAreaType,
+      'profileImage': _profileImage?.path,
+    };
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GuarantorInfoScreen(memberData: memberData),
+      ),
+    );
+  }
 }

@@ -1,7 +1,7 @@
 class Member {
   String id;
   String fullName;
-  String idNumber;
+  String rifleNumber;
   String phone;
   DateTime dateOfBirth;
   String address;
@@ -9,12 +9,13 @@ class Member {
   DateTime joinDate;
   String? profileImage;
   bool isActive;
+  String? location;
   Map<String, dynamic>? additionalInfo;
 
   Member({
     required this.id,
     required this.fullName,
-    required this.idNumber,
+    required this.rifleNumber,
     required this.phone,
     required this.dateOfBirth,
     required this.address,
@@ -23,13 +24,15 @@ class Member {
     this.profileImage,
     this.isActive = true,
     this.additionalInfo,
+    this.location,
+
   });
 
   factory Member.fromMap(Map<String, dynamic> data, String id) {
     return Member(
       id: id,
       fullName: data['fullName'] ?? '',
-      idNumber: data['idNumber'] ?? '',
+      rifleNumber: data['rifleNumber'] ?? '', // Updated field name
       phone: data['phone'] ?? '',
       dateOfBirth: DateTime.fromMillisecondsSinceEpoch(data['dateOfBirth']),
       address: data['address'] ?? '',
@@ -38,13 +41,14 @@ class Member {
       profileImage: data['profileImage'],
       isActive: data['isActive'] ?? true,
       additionalInfo: data['additionalInfo'],
+      location: data['location']
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'fullName': fullName,
-      'idNumber': idNumber,
+      'rifleNumber': rifleNumber,
       'phone': phone,
       'dateOfBirth': dateOfBirth.millisecondsSinceEpoch,
       'address': address,
@@ -54,14 +58,18 @@ class Member {
       'isActive': isActive,
       'additionalInfo': additionalInfo,
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      'location': location
     };
   }
 
-  // Optional: Add copyWith method
+  // Add getter for compatibility
+  String get idNumber => rifleNumber;
+
+  // Updated copyWith method
   Member copyWith({
     String? id,
     String? fullName,
-    String? idNumber,
+    String? rifleNumber,
     String? phone,
     DateTime? dateOfBirth,
     String? address,
@@ -70,11 +78,12 @@ class Member {
     String? profileImage,
     bool? isActive,
     Map<String, dynamic>? additionalInfo,
+    String? location,
   }) {
     return Member(
       id: id ?? this.id,
       fullName: fullName ?? this.fullName,
-      idNumber: idNumber ?? this.idNumber,
+      rifleNumber: rifleNumber ?? this.rifleNumber,
       phone: phone ?? this.phone,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       address: address ?? this.address,
@@ -83,6 +92,7 @@ class Member {
       profileImage: profileImage ?? this.profileImage,
       isActive: isActive ?? this.isActive,
       additionalInfo: additionalInfo ?? this.additionalInfo,
+      location: location?? this.location
     );
   }
 }

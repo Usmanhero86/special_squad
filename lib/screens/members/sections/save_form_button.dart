@@ -25,7 +25,7 @@ class _SaveFormButtonState extends State<SaveFormButton> {
       child: ElevatedButton(
         onPressed: widget.onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.blue,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
