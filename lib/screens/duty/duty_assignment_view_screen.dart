@@ -90,8 +90,8 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Duty Assignments'),
-        leading: Text(
+        title: const Text('Duty Assignments'),
+        subtitle: Text(
           '${widget.selectedDate.day}/${widget.selectedDate.month}/${widget.selectedDate.year}',
         ),
         actions: const [ThemeToggleButton()],
@@ -112,14 +112,18 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
           Icon(
             Icons.assignment_outlined,
             size: 64,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
           const SizedBox(height: 16),
           Text(
             'No duties assigned for this date',
             style: TextStyle(
               fontSize: 18,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
@@ -127,7 +131,9 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
             'Assignments will appear here once duties are scheduled',
             style: TextStyle(
               fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.4),
             ),
             textAlign: TextAlign.center,
           ),
@@ -189,7 +195,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                                 fontSize: 14,
                                 color: Theme.of(
                                   context,
-                                ).colorScheme.onSurface.withOpacity(0.6),
+                                ).colorScheme.onSurface.withValues(alpha: 0.6),
                               ),
                             ),
                         ],
@@ -203,7 +209,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                       decoration: BoxDecoration(
                         color: Theme.of(
                           context,
-                        ).colorScheme.secondary.withOpacity(0.1),
+                        ).colorScheme.secondary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -227,7 +233,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                       fontSize: 14,
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.7),
+                      ).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -266,10 +272,12 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+          color: Theme.of(
+            context,
+          ).colorScheme.errorContainer.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+            color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -296,10 +304,12 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -309,7 +319,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
             radius: 20,
             backgroundColor: Theme.of(
               context,
-            ).colorScheme.primary.withOpacity(0.1),
+            ).colorScheme.primary.withValues(alpha: 0.1),
             child: member.profileImage != null
                 ? ClipOval(
                     child: Image.file(
@@ -353,7 +363,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                     fontSize: 12,
                     color: Theme.of(
                       context,
-                    ).colorScheme.onSurface.withOpacity(0.6),
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 if (member.location != null && member.location!.isNotEmpty)
@@ -363,7 +373,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                       fontSize: 12,
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.6),
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
               ],
@@ -377,7 +387,9 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getShiftColor(assignment.shift).withOpacity(0.1),
+                  color: _getShiftColor(
+                    assignment.shift,
+                  ).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -393,7 +405,9 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(assignment.status).withOpacity(0.1),
+                  color: _getStatusColor(
+                    assignment.status,
+                  ).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
