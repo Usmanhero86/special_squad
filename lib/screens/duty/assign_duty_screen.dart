@@ -5,6 +5,7 @@ import '../../models/duty_post.dart';
 import '../../models/duty_roster.dart';
 import '../../services/duty_service.dart';
 import '../../services/member_service.dart';
+import 'duty_assignment_view_screen.dart';
 
 class AssignDutyScreen extends StatefulWidget {
   final String? dutyPostId;
@@ -63,27 +64,19 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
             location.contains('hq');
       }).toList();
 
-      // Debug: Check for duplicate IDs
-      final memberIds = hqMembers.map((m) => m.id).toList();
-      final uniqueIds = memberIds.toSet();
-      if (memberIds.length != uniqueIds.length) {
-        print('Warning: Duplicate member IDs found in HQ members');
-        // Remove duplicates by converting to Set and back to List
-        final uniqueMembers = <Member>[];
-        final seenIds = <String>{};
-        for (final member in hqMembers) {
-          if (!seenIds.contains(member.id)) {
-            seenIds.add(member.id);
-            uniqueMembers.add(member);
-          }
+      // Remove duplicates by converting to Set and back to List
+      final uniqueMembers = <Member>[];
+      final seenIds = <String>{};
+      for (final member in hqMembers) {
+        if (!seenIds.contains(member.id)) {
+          seenIds.add(member.id);
+          uniqueMembers.add(member);
         }
-        hqMembers.clear();
-        hqMembers.addAll(uniqueMembers);
       }
 
       if (mounted) {
         setState(() {
-          _hqMembers = hqMembers;
+          _hqMembers = uniqueMembers;
           _posts = posts;
           _isLoading = false;
         });
@@ -106,78 +99,129 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Assign Duty')),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(
+        title: const Text(
+          'Assign Duty',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.visibility),
+            onPressed: _viewAssignments,
+            tooltip: 'View Assignments',
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _hqMembers.isEmpty
-          ? _buildNoHQMembersState()
-          : Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+              ? _buildNoHQMembersState()
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Column(
                       children: [
-                        _buildInfoCard(),
-                        const SizedBox(height: 20),
-                        _buildDatePicker(),
-                        const SizedBox(height: 20),
-                        _buildShiftSelector(),
-                        const SizedBox(height: 20),
-                        _buildPostSelector(),
-                        const SizedBox(height: 20),
-                        _buildMemberSelector(),
-                        const SizedBox(height: 20),
-                        _buildNotesField(),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                ),
-                // Fixed button at bottom
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    border: Border(
-                      top: BorderSide(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.outline.withOpacity(0.2),
-                      ),
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _canAssignDuty() ? _assignDuty : null,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onPrimary,
-                          disabledBackgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.outline.withOpacity(0.3),
-                        ),
-                        child: Text(
-                          _getButtonText(),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: constraints.maxWidth > 600 ? 32 : 16,
+                              vertical: 16,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildInfoCard(constraints),
+                                const SizedBox(height: 20),
+                                _buildResponsiveRow(
+                                  constraints,
+                                  [
+                                    Expanded(child: _buildDatePicker()),
+                                    const SizedBox(width: 16),
+                                    Expanded(child: _buildShiftSelector()),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                _buildPostSelector(constraints),
+                                const SizedBox(height: 20),
+                                _buildMemberSelector(constraints),
+                                const SizedBox(height: 20),
+                                _buildNotesField(constraints),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                  ),
+                        _buildFixedBottomButton(constraints),
+                      ],
+                    );
+                  },
                 ),
-              ],
+    );
+  }
+
+  Widget _buildResponsiveRow(
+    BoxConstraints constraints,
+    List<Widget> children,
+  ) {
+    if (constraints.maxWidth > 600) {
+      return Row(children: children);
+    } else {
+      return Column(
+        children: children
+            .where((child) => child is! SizedBox || child.key != null)
+            .map(
+              (child) => child is SizedBox
+                  ? const SizedBox(height: 16)
+                  : Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: child,
+                    ),
+            )
+            .toList(),
+      );
+    }
+  }
+
+  Widget _buildFixedBottomButton(BoxConstraints constraints) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: constraints.maxWidth > 600 ? 32 : 16,
+        vertical: 16,
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          ),
+        ),
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _canAssignDuty() ? _assignDuty : null,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              disabledBackgroundColor: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
+            child: Text(
+              _getButtonText(),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -205,7 +249,9 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
             Icon(
               Icons.location_off,
               size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 16),
             Text(
@@ -215,13 +261,16 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               'Only members from HQ location can be assigned duties. Please ensure members have "HQ" or "Headquarters" as their location.',
               style: TextStyle(
                 fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -237,11 +286,13 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
     );
   }
 
-  Widget _buildInfoCard() {
+  Widget _buildInfoCard(BoxConstraints constraints) {
     return Card(
-      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+      color: Theme.of(
+        context,
+      ).colorScheme.primaryContainer.withValues(alpha: 0.3),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(constraints.maxWidth > 600 ? 20 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -252,12 +303,14 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'Duty Assignment Rules',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+                Expanded(
+                  child: Text(
+                    'Duty Assignment Rules',
+                    style: TextStyle(
+                      fontSize: constraints.maxWidth > 600 ? 18 : 16,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
               ],
@@ -268,15 +321,19 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
               '• Multiple members can be assigned to the same duty post\n'
               '• Each member will have their own duty record',
               style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                fontSize: constraints.maxWidth > 600 ? 15 : 14,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.8),
               ),
             ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                color: Theme.of(
+                  context,
+                ).colorScheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -309,7 +366,7 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               border: Border.all(color: Theme.of(context).colorScheme.outline),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
@@ -318,16 +375,15 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                  style: const TextStyle(fontSize: 16),
+                Expanded(
+                  child: Text(
+                    '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                    style: const TextStyle(fontSize: 16),
+                  ),
                 ),
-                const Spacer(),
                 Icon(
                   Icons.arrow_drop_down,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withOpacity(0.6),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ],
             ),
@@ -348,9 +404,11 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           initialValue: _selectedShift,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           ),
           items: _shifts
               .map(
@@ -367,7 +425,7 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
     );
   }
 
-  Widget _buildPostSelector() {
+  Widget _buildPostSelector(BoxConstraints constraints) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -378,17 +436,22 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           initialValue: _selectedPostId,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           ),
           hint: const Text('Select a duty post'),
+          isExpanded: true, // This makes it responsive
           items: _posts
               .map(
                 (post) => DropdownMenuItem(
                   value: post.id,
                   child: Text(
                     '${post.name} (${post.location ?? 'No location'})',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
               )
@@ -403,22 +466,24 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
     );
   }
 
-  Widget _buildMemberSelector() {
+  Widget _buildMemberSelector(BoxConstraints constraints) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Select Members (HQ Only)',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            const Expanded(
+              child: Text(
+                'Select Members (HQ Only)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
             ),
             if (_selectedMemberIds.isNotEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -440,12 +505,10 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
               ),
-              borderRadius: BorderRadius.circular(8),
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,9 +518,7 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withOpacity(0.8),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -474,25 +535,24 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withOpacity(0.1),
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withOpacity(0.3),
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            member.fullName,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w500,
+                          Flexible(
+                            child: Text(
+                              member.fullName,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -521,16 +581,17 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
 
         // Member selection dropdown
         DropdownButtonFormField<String>(
-          key: ValueKey(
-            'member_dropdown_${_selectedMemberIds.length}',
-          ), // Force rebuild
-          initialValue: null, // Always null to reset after selection
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          key: ValueKey('member_dropdown_${_selectedMemberIds.length}'),
+          initialValue: null,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             hintText: 'Add a member to assignment',
-            prefixIcon: Icon(Icons.person_add),
+            prefixIcon: const Icon(Icons.person_add),
           ),
+          isExpanded: true, // This makes it responsive
           items: _hqMembers
               .where((member) => !_selectedMemberIds.contains(member.id))
               .map(
@@ -543,15 +604,15 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
                       Text(
                         member.fullName,
                         style: const TextStyle(fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         'ID: ${member.rifleNumber} • ${member.location ?? 'HQ'}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withOpacity(0.6),
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -577,7 +638,7 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
               'All HQ members have been selected',
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -586,7 +647,7 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
     );
   }
 
-  Widget _buildNotesField() {
+  Widget _buildNotesField(BoxConstraints constraints) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -597,9 +658,11 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: _notesController,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
+          maxLines: constraints.maxWidth > 600 ? 4 : 3,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             hintText: 'Enter any special instructions...',
           ),
         ),
@@ -621,6 +684,59 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
     }
   }
 
+  Future<void> _viewAssignments() async {
+    final dutyService = Provider.of<DutyService>(context, listen: false);
+    
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Load assignments for the selected date - using a method that should exist
+      final assignments = await dutyService.getDutyRostersByDateRange(_selectedDate, _selectedDate);
+      
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        
+        if (assignments.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'No duties assigned for ${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DutyAssignmentViewScreen(
+                selectedDate: _selectedDate,
+                assignments: assignments,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading assignments: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _assignDuty() async {
     if (_selectedMemberIds.isEmpty || _selectedPostId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -636,6 +752,15 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
     final notes = _notesController.text.trim();
 
     try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
       // Create duty roster entries for each selected member
       final duties = <DutyRoster>[];
       for (final memberId in _selectedMemberIds) {
@@ -657,19 +782,31 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
       }
 
       if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Successfully assigned ${_selectedMemberIds.length} member(s) to duty',
             ),
             backgroundColor: Colors.green,
+            action: SnackBarAction(
+              label: 'View Assignments',
+              onPressed: _viewAssignments,
+            ),
           ),
         );
 
-        Navigator.pop(context, true); // Return true to indicate success
+        // Reset form
+        setState(() {
+          _selectedMemberIds.clear();
+          _selectedPostId = null;
+          _notesController.clear();
+        });
       }
     } catch (e) {
       if (mounted) {
+        Navigator.pop(context); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error assigning duty: $e'),
