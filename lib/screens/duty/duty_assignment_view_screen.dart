@@ -91,7 +91,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Duty Assignments'),
-        subtitle: Text(
+        leading: Text(
           '${widget.selectedDate.day}/${widget.selectedDate.month}/${widget.selectedDate.year}',
         ),
         actions: const [ThemeToggleButton()],
