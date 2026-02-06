@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:special_squad/screens/members/member_list_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../services/memberProvider.dart';
 import 'search/search_screen.dart';
 import 'settings/settings_screen.dart';
 
@@ -45,13 +48,14 @@ class _MainDashboardState extends State<MainDashboard> {
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          selectedItemColor: Theme.of(context).colorScheme.primary,
+          selectedItemColor: const Color(0xFF2C3E50),
           unselectedItemColor: Theme.of(
             context,
           ).colorScheme.onSurface.withValues(alpha: 0.6),
           selectedLabelStyle: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
+            color: Color(0xFF2C3E50)
           ),
           unselectedLabelStyle: const TextStyle(
             fontSize: 12,
@@ -82,6 +86,19 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _loadUserInfo();
+  }
+  String _userName = '';
+  String _userRole = '';
+  bool _isUserLoading = true;
+  Future<void> _loadUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    setState(() {
+      _userName = prefs.getString('userName') ?? 'Admin';
+      _userRole = prefs.getString('userRole') ?? 'User';
+      _isUserLoading = false;
+    });
   }
 
   String _getGreeting() {
@@ -181,7 +198,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
 
                     // Greeting
                     Text(
-                      'Hi Muhammad!',
+                      'Hi $_userName!',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -201,14 +218,14 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
 
                     // User Profile Card
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ProfileScreen(),
-                          ),
-                        );
-                      },
+                      // onTap: () {
+                      //   Navigator.push(
+                      //     context,
+                      //     MaterialPageRoute(
+                      //       builder: (context) => const ProfileScreen(),
+                      //     ),
+                      //   );
+                      // },
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -242,8 +259,8 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Muhammad Sani',
+                                   Text(
+                                    _userName,
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -252,7 +269,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Commander',
+                                    _userRole,
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.white.withValues(
@@ -319,11 +336,11 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                         ),
                         _buildDashboardCard(
                           context,
-                          icon: Icons.schedule,
-                          title: 'Duty Roaster',
-                          subtitle: 'Schedule duties',
+                          icon: Icons.location_pin,
+                          title: 'Location',
+                          subtitle: 'Add Location',
                           backgroundColor: Colors.white,
-                          iconColor: const Color(0xFF2C3E50),
+                          iconColor:  Color(0xFF2C3E50),
                           textColor: const Color(0xFF2C3E50),
                           onTap: () =>
                               Navigator.pushNamed(context, '/duty/roster'),
@@ -350,16 +367,16 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                           onTap: () =>
                               Navigator.pushNamed(context, '/payments/history'),
                         ),
-                        _buildDashboardCard(
-                          context,
-                          icon: Icons.person,
-                          title: 'Reports',
-                          subtitle: 'Generate reports',
-                          backgroundColor: Colors.white,
-                          iconColor: const Color(0xFF2C3E50),
-                          textColor: const Color(0xFF2C3E50),
-                          onTap: () => _showReports(context),
-                        ),
+                        // _buildDashboardCard(
+                        //   context,
+                        //   icon: Icons.person,
+                        //   title: 'Reports',
+                        //   subtitle: 'Generate reports',
+                        //   backgroundColor: Colors.white,
+                        //   iconColor: const Color(0xFF2C3E50),
+                        //   textColor: const Color(0xFF2C3E50),
+                        //   onTap: () => _showReports(context),
+                        // ),
                       ],
                     ),
                     const SizedBox(height: 30),
@@ -419,9 +436,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
               ),
               child: Icon(
                 icon,
-                color: backgroundColor == Colors.white
-                    ? iconColor // Colored icon on white background
-                    : Colors.white, // White icon on colored background
+                color: Colors.white, // White icon on colored background
                 size: 20,
               ),
             ),

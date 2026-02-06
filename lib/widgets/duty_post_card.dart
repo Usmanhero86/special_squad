@@ -37,21 +37,21 @@ class DutyPostCard extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 2),
-            if (post.location != null && post.location!.isNotEmpty)
-              Text(post.location!),
-            if (post.description != null && post.description!.isNotEmpty)
-              Text(
-                post.description!,
-                style: TextStyle(fontSize: 12),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-          ],
-        ),
+        // subtitle: Column(
+        //   crossAxisAlignment: CrossAxisAlignment.start,
+        //   children: [
+        //     SizedBox(height: 2),
+        //     if (post.name != null && post.name!.isNotEmpty)
+        //       Text(post.name!),
+        //     if (post.id != null && post.id!.isNotEmpty)
+        //       Text(
+        //         post.id!,
+        //         style: TextStyle(fontSize: 12),
+        //         maxLines: 2,
+        //         overflow: TextOverflow.ellipsis,
+        //       ),
+        //   ],
+        // ),
         trailing: PopupMenuButton(
           onSelected: (value) {
             if (value == 'edit') {

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../models/getAllMember.dart';
 import '../../models/member.dart';
 import '../../models/duty_post.dart';
 import '../../models/duty_roster.dart';
-import '../../services/duty_service.dart';
+
 import '../../services/member_service.dart';
-import 'duty_assignment_view_screen.dart';
+import '../../services/duty_service.dart';
+import '../../services/members.dart';
 
 class AssignDutyScreen extends StatefulWidget {
   final String? dutyPostId;
@@ -26,8 +29,10 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
   String _selectedShift = 'Morning';
   List<String> _selectedMemberIds = [];
   String? _selectedPostId;
+
   List<Member> _hqMembers = [];
   List<DutyPost> _posts = [];
+
   final TextEditingController _notesController = TextEditingController();
   bool _isLoading = true;
 
@@ -36,59 +41,77 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
   @override
   void initState() {
     super.initState();
+
     _selectedPostId = widget.dutyPostId;
+
     if (widget.preSelectedMemberId != null) {
       _selectedMemberIds = [widget.preSelectedMemberId!];
     }
+
     _loadData();
   }
 
+  // ===============================
+  // LOAD MEMBERS AND POSTS (MAIN FIX)
+  // ===============================
   Future<void> _loadData() async {
-    final memberService = Provider.of<MemberService>(context, listen: false);
+    final memberService = Provider.of<MemberServices>(context, listen: false);
     final dutyService = Provider.of<DutyService>(context, listen: false);
 
     try {
-      final results = await Future.wait([
-        memberService.getMembersSync(),
-        dutyService.getDutyPosts(),
-      ]);
+      debugPrint('🟡 LOAD DUTY ASSIGNMENT DATA');
 
-      final allMembers = results[0] as List<Member>;
-      final posts = results[1] as List<DutyPost>;
+      // 1️⃣ FETCH DUTY MEMBERS
+      final dutyMembers = await memberService.getDutyMembers();
+      debugPrint('✅ DUTY MEMBERS FETCHED: ${dutyMembers.length}');
 
-      // Filter members to only include those from HQ location
-      final hqMembers = allMembers.where((member) {
-        final location = member.location?.toLowerCase() ?? '';
-        return location == 'hq' ||
-            location == 'headquarters' ||
-            location.contains('hq');
+      // 2️⃣ FETCH DUTY POSTS — DATE IS REQUIRED ✅
+      final List<DutyPost> posts = await dutyService.getDutyPosts(
+        page: 1,
+        limit: 100,
+        date: _selectedDate, // ✅ REQUIRED FIX
+      );
+
+      debugPrint('✅ DUTY POSTS FETCHED: ${posts.length}');
+
+      // 3️⃣ FILTER HQ MEMBERS
+      final hqMembers = dutyMembers.where((m) {
+        final location = m.location?.toLowerCase() ?? '';
+        return location.contains('hq');
       }).toList();
 
-      // Remove duplicates by converting to Set and back to List
-      final uniqueMembers = <Member>[];
-      final seenIds = <String>{};
-      for (final member in hqMembers) {
-        if (!seenIds.contains(member.id)) {
-          seenIds.add(member.id);
-          uniqueMembers.add(member);
-        }
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _hqMembers = hqMembers
+            .map(
+              (m) => Member(
+            id: m.id,
+            fullName: m.fullName,
+            rifleNumber: m.rifleNo,
+            phone: '',
+            dateOfBirth: DateTime.now(),
+            address: '',
+            position: m.position,
+            joinDate: DateTime.now(),
+            isActive: m.isActive,
+            location: m.location,
+          ),
+        )
+            .toList();
+
+        _posts = posts; // ✅ FIXED TYPE
+        _isLoading = false;
+      });
+    } catch (e, s) {
+      debugPrint('❌ LOAD DUTY DATA ERROR: $e');
+      debugPrint(s.toString());
 
       if (mounted) {
-        setState(() {
-          _hqMembers = uniqueMembers;
-          _posts = posts;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading data: $e'),
+            content: Text('Failed to load duty data: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -96,295 +119,234 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
     }
   }
 
+  // ===============================
+  // ADD DUTY POST
+  // ===============================
+  void _showAddDutyPostDialog() {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Duty Post'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Enter post name',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isEmpty) return;
+
+              Navigator.pop(context);
+
+              final dutyService = Provider.of<DutyService>(context, listen: false);
+
+              try {
+                debugPrint('🟡 ADD DUTY POST STARTED');
+                debugPrint('📤 POST NAME: $name');
+
+                final post = await dutyService.addDutyPost(name);
+
+                debugPrint('✅ DUTY POST CREATED: ${post.id}');
+
+                setState(() {
+                  _posts.add(post);
+                  _selectedPostId = post.id;
+                });
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Duty post "$name" created successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+
+              } catch (e, s) {
+                debugPrint('❌ ADD DUTY POST ERROR: $e');
+                debugPrint(s.toString());
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to create duty post: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================
+  // UI
+  // ===============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
-          'Assign Duty',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
+        title: const Text('Assign Duty'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.visibility),
-            onPressed: _viewAssignments,
-            tooltip: 'View Assignments',
-          ),
-        ],
+
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _hqMembers.isEmpty
-              ? _buildNoHQMembersState()
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Column(
-                      children: [
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: constraints.maxWidth > 600 ? 32 : 16,
-                              vertical: 16,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildInfoCard(constraints),
-                                const SizedBox(height: 20),
-                                _buildResponsiveRow(
-                                  constraints,
-                                  [
-                                    Expanded(child: _buildDatePicker()),
-                                    const SizedBox(width: 16),
-                                    Expanded(child: _buildShiftSelector()),
-                                  ],
-                                ),
-                                const SizedBox(height: 20),
-                                _buildPostSelector(constraints),
-                                const SizedBox(height: 20),
-                                _buildMemberSelector(constraints),
-                                const SizedBox(height: 20),
-                                _buildNotesField(constraints),
-                                const SizedBox(height: 20),
-                              ],
-                            ),
-                          ),
-                        ),
-                        _buildFixedBottomButton(constraints),
-                      ],
-                    );
-                  },
-                ),
+          ? _buildNoHQMembersState()
+          : _buildContent(),
     );
   }
 
-  Widget _buildResponsiveRow(
-    BoxConstraints constraints,
-    List<Widget> children,
-  ) {
-    if (constraints.maxWidth > 600) {
-      return Row(children: children);
-    } else {
-      return Column(
-        children: children
-            .where((child) => child is! SizedBox || child.key != null)
-            .map(
-              (child) => child is SizedBox
-                  ? const SizedBox(height: 16)
-                  : Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: child,
-                    ),
-            )
-            .toList(),
-      );
-    }
-  }
-
-  Widget _buildFixedBottomButton(BoxConstraints constraints) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: constraints.maxWidth > 600 ? 32 : 16,
-        vertical: 16,
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+  Widget _buildContent() {
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // _buildDutyPostSelector(),
+              // const SizedBox(height: 16),
+              _buildDateSelector(),
+              const SizedBox(height: 16),
+              _buildShiftSelector(),
+              const SizedBox(height: 16),
+              _buildMemberSelector(),
+              const SizedBox(height: 16),
+              _buildSelectedMembers(),
+              const SizedBox(height: 16),
+              _buildNotesField(),
+            ],
           ),
         ),
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _canAssignDuty() ? _assignDuty : null,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              disabledBackgroundColor: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              _getButtonText(),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-      ),
+        _buildAssignButton(),
+      ],
     );
-  }
-
-  bool _canAssignDuty() {
-    return _selectedMemberIds.isNotEmpty && _selectedPostId != null;
-  }
-
-  String _getButtonText() {
-    if (_selectedMemberIds.isEmpty) {
-      return 'Select Members to Assign';
-    } else if (_selectedPostId == null) {
-      return 'Select Duty Post';
-    } else {
-      return 'Assign Duty to ${_selectedMemberIds.length} Member(s)';
-    }
   }
 
   Widget _buildNoHQMembersState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.location_off,
-              size: 64,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No HQ Members Available',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Only members from HQ location can be assigned duties. Please ensure members have "HQ" or "Headquarters" as their location.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Go Back'),
-            ),
-          ],
-        ),
+      child: Text(
+        'No HQ Members Available',
+        style: Theme.of(context).textTheme.titleLarge,
       ),
     );
   }
 
-  Widget _buildInfoCard(BoxConstraints constraints) {
-    return Card(
-      color: Theme.of(
-        context,
-      ).colorScheme.primaryContainer.withValues(alpha: 0.3),
-      child: Padding(
-        padding: EdgeInsets.all(constraints.maxWidth > 600 ? 20 : 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Duty Assignment Rules',
-                    style: TextStyle(
-                      fontSize: constraints.maxWidth > 600 ? 18 : 16,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '• Only members from HQ location can be assigned duties\n'
-              '• Multiple members can be assigned to the same duty post\n'
-              '• Each member will have their own duty record',
-              style: TextStyle(
-                fontSize: constraints.maxWidth > 600 ? 15 : 14,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.8),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.secondary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${_hqMembers.length} HQ members available',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.secondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
+  Widget _buildMemberSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Select Members (HQ Only)',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-      ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          hint: const Text('Select member'),
+          items: _hqMembers
+              .map(
+                (member) => DropdownMenuItem(
+              value: member.id,
+              child: Text(member.fullName),
+            ),
+          )
+              .toList(),
+          onChanged: (value) {
+            if (value != null && !_selectedMemberIds.contains(value)) {
+              setState(() {
+                _selectedMemberIds.add(value);
+              });
+            }
+          },
+        ),
+      ],
     );
   }
 
-  Widget _buildDatePicker() {
+  Widget _buildDutyPostSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Select Duty Post',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _selectedPostId,
+          isExpanded: true,
+          hint: const Text('Select duty post'),
+          items: _posts
+              .map(
+                (post) => DropdownMenuItem(
+              value: post.id,
+              child: Text(post.name),
+            ),
+          )
+              .toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedPostId = value;
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Select Date',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _pickDate,
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () async {
+            final date = await showDatePicker(
+              context: context,
+              initialDate: _selectedDate,
+              firstDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+            );
+            if (date != null) {
+              setState(() {
+                _selectedDate = date;
+              });
+            }
+          },
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).colorScheme.outline),
-              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  Icons.calendar_today,
-                  color: Theme.of(context).colorScheme.primary,
+                Text(
+                  '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
+                const Icon(Icons.calendar_today),
               ],
             ),
           ),
@@ -399,417 +361,137 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
       children: [
         const Text(
           'Select Shift',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          initialValue: _selectedShift,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          ),
+          value: _selectedShift,
+          isExpanded: true,
           items: _shifts
               .map(
-                (shift) => DropdownMenuItem(value: shift, child: Text(shift)),
-              )
+                (shift) => DropdownMenuItem(
+              value: shift,
+              child: Text(shift),
+            ),
+          )
               .toList(),
           onChanged: (value) {
-            setState(() {
-              _selectedShift = value!;
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPostSelector(BoxConstraints constraints) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Select Duty Post',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedPostId,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          ),
-          hint: const Text('Select a duty post'),
-          isExpanded: true, // This makes it responsive
-          items: _posts
-              .map(
-                (post) => DropdownMenuItem(
-                  value: post.id,
-                  child: Text(
-                    '${post.name} (${post.location ?? 'No location'})',
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedPostId = value;
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMemberSelector(BoxConstraints constraints) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Expanded(
-              child: Text(
-                'Select Members (HQ Only)',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-            ),
-            if (_selectedMemberIds.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${_selectedMemberIds.length} selected',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-
-        // Selected members display
-        if (_selectedMemberIds.isNotEmpty) ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-              ),
-              borderRadius: BorderRadius.circular(12),
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Selected Members:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _selectedMemberIds.map((memberId) {
-                    final member = _hqMembers.firstWhere(
-                      (m) => m.id == memberId,
-                    );
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              member.fullName,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedMemberIds.remove(memberId);
-                              });
-                            },
-                            child: Icon(
-                              Icons.close,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // Member selection dropdown
-        DropdownButtonFormField<String>(
-          key: ValueKey('member_dropdown_${_selectedMemberIds.length}'),
-          initialValue: null,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            hintText: 'Add a member to assignment',
-            prefixIcon: const Icon(Icons.person_add),
-          ),
-          isExpanded: true, // This makes it responsive
-          items: _hqMembers
-              .where((member) => !_selectedMemberIds.contains(member.id))
-              .map(
-                (member) => DropdownMenuItem(
-                  value: member.id,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        member.fullName,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        'ID: ${member.rifleNumber} • ${member.location ?? 'HQ'}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            if (value != null && !_selectedMemberIds.contains(value)) {
+            if (value != null) {
               setState(() {
-                _selectedMemberIds.add(value);
+                _selectedShift = value;
               });
             }
           },
         ),
-
-        if (_hqMembers
-                .where((member) => !_selectedMemberIds.contains(member.id))
-                .isEmpty &&
-            _selectedMemberIds.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'All HQ members have been selected',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
       ],
     );
   }
 
-  Widget _buildNotesField(BoxConstraints constraints) {
+  Widget _buildSelectedMembers() {
+    if (_selectedMemberIds.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Selected Members',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _selectedMemberIds.map((id) {
+            final member = _hqMembers.firstWhere((m) => m.id == id);
+            return Chip(
+              label: Text(member.fullName),
+              onDeleted: () {
+                setState(() {
+                  _selectedMemberIds.remove(id);
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotesField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Notes (Optional)',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         TextField(
           controller: _notesController,
-          maxLines: constraints.maxWidth > 600 ? 4 : 3,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            hintText: 'Enter any special instructions...',
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Enter any additional notes...',
+            border: OutlineInputBorder(),
           ),
         ),
       ],
     );
   }
 
-  Future<void> _pickDate() async {
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+  Widget _buildAssignButton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _canAssignDuty() ? _assignDuty : null,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: const Text('Assign Duty'),
+        ),
+      ),
     );
-    if (pickedDate != null) {
-      setState(() {
-        _selectedDate = pickedDate;
-      });
-    }
   }
 
-  Future<void> _viewAssignments() async {
-    final dutyService = Provider.of<DutyService>(context, listen: false);
-    
-    try {
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-
-      // Load assignments for the selected date - using a method that should exist
-      final assignments = await dutyService.getDutyRostersByDateRange(_selectedDate, _selectedDate);
-      
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        
-        if (assignments.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'No duties assigned for ${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-              ),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => DutyAssignmentViewScreen(
-                selectedDate: _selectedDate,
-                assignments: assignments,
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading assignments: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  bool _canAssignDuty() {
+    return _selectedMemberIds.isNotEmpty && _selectedPostId != null;
   }
 
   Future<void> _assignDuty() async {
-    if (_selectedMemberIds.isEmpty || _selectedPostId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select both members and a duty post'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    if (!_canAssignDuty()) return;
 
-    final dutyService = Provider.of<DutyService>(context, listen: false);
-    final notes = _notesController.text.trim();
+    debugPrint('🟡 ASSIGN DUTY CLICKED');
 
     try {
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+      final dutyService = Provider.of<DutyService>(context, listen: false);
+
+      final success = await dutyService.assignDuty(
+        postId: _selectedPostId!,
+        memberIds: _selectedMemberIds,
+        date: _selectedDate,
+        shift: _selectedShift,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       );
 
-      // Create duty roster entries for each selected member
-      final duties = <DutyRoster>[];
-      for (final memberId in _selectedMemberIds) {
-        final duty = DutyRoster(
-          id: '${DateTime.now().millisecondsSinceEpoch}_$memberId',
-          memberId: memberId,
-          dutyPostId: _selectedPostId!,
-          date: _selectedDate,
-          shift: _selectedShift,
-          status: 'Scheduled',
-          notes: notes.isNotEmpty ? notes : null,
-        );
-        duties.add(duty);
-      }
-
-      // Save all duties to database
-      for (final duty in duties) {
-        await dutyService.addDutyRoster(duty);
-      }
-
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        
+      if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Successfully assigned ${_selectedMemberIds.length} member(s) to duty',
-            ),
+          const SnackBar(
+            content: Text('Duty assigned successfully!'),
             backgroundColor: Colors.green,
-            action: SnackBarAction(
-              label: 'View Assignments',
-              onPressed: _viewAssignments,
-            ),
           ),
         );
-
-        // Reset form
-        setState(() {
-          _selectedMemberIds.clear();
-          _selectedPostId = null;
-          _notesController.clear();
-        });
+        Navigator.pop(context, true);
       }
     } catch (e) {
+      debugPrint('❌ ASSIGN DUTY ERROR: $e');
+
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error assigning duty: $e'),
+            content: Text('Failed to assign duty: $e'),
             backgroundColor: Colors.red,
           ),
         );

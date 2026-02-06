@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'package:special_squad/screens/auth/login_screen.dart';
 import 'package:special_squad/screens/main_dashboard.dart';
 import 'package:special_squad/screens/auth/register_screen.dart';
@@ -7,33 +8,33 @@ import 'package:special_squad/screens/members/member_list_screen.dart';
 import 'package:special_squad/screens/members/add_member_screen.dart';
 import 'package:special_squad/screens/payments/payment_history_screen.dart';
 import 'package:special_squad/screens/duty/duty_post_screen.dart';
-import 'package:special_squad/screens/duty/duty_roster_screen.dart';
+import 'package:special_squad/screens/location/location.dart';
 import 'package:special_squad/screens/payments/payments_screen.dart';
 import 'package:special_squad/screens/splash/splash_screen.dart';
+
 import 'package:special_squad/services/auth_service.dart';
 import 'package:special_squad/services/duty_service.dart';
+import 'package:special_squad/services/location_provider.dart';
+import 'package:special_squad/services/location_service.dart';
+import 'package:special_squad/services/login.dart';
+import 'package:special_squad/services/memberProvider.dart';
 import 'package:special_squad/services/member_service.dart';
+import 'package:special_squad/services/members.dart';
+import 'package:special_squad/services/payment.dart';
 import 'package:special_squad/services/payment_service.dart';
 import 'package:special_squad/services/theme_service.dart';
+
+import 'core/api_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize services and database before running the app
   final memberService = MemberService();
-  await memberService.initializeDatabase();
-
-  final paymentService = PaymentService();
-  // Ensure payments table exists
-  await paymentService.getRecentPayments();
-
-  // Initialize ThemeService
   final themeService = ThemeService();
 
   runApp(
     MyApp(
       memberService: memberService,
-      paymentService: paymentService,
       themeService: themeService,
     ),
   );
@@ -41,25 +42,71 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final MemberService memberService;
-  final PaymentService paymentService;
   final ThemeService themeService;
 
   const MyApp({
     super.key,
     required this.memberService,
-    required this.paymentService,
     required this.themeService,
   });
 
   @override
   Widget build(BuildContext context) {
+    final apiClient = ApiClient(
+      baseUrl: 'https://api.cjtf.buzz',
+    );
+
     return MultiProvider(
       providers: [
+
+        Provider<ApiClient>.value(value: apiClient),
+
+        /// ================= API SERVICES =================
+        Provider<AuthService>(
+          create: (context) => AuthService(
+            api: context.read<ApiClient>(),
+          ),
+        ),        Provider<DutyService>(
+          create: (context) =>
+              DutyService(api: context.read<ApiClient>()),
+        ),
+        Provider<LocationService>(
+          create: (context) =>
+              LocationService(api: context.read<ApiClient>()),
+        ),
+
+        Provider<MemberServices>(
+          create: (context) =>
+              MemberServices(api: context.read<ApiClient>()),
+        ),
+
+        Provider<PaymentService>(
+          create: (_) => PaymentService(api: apiClient),
+        ),
+
+        Provider<PaymentServices>(
+          create: (_) => PaymentServices(api: apiClient),
+        ),
+
+        /// ================= STATE (ChangeNotifier) =================
+        ChangeNotifierProvider<ThemeService>.value(
+          value: themeService,
+        ),
+
+        ChangeNotifierProvider<LocationProvider>(
+          create: (context) => LocationProvider(
+            service: context.read<LocationService>(),
+          ),
+        ),
+
+        ChangeNotifierProvider<MembersProvider>(
+          create: (context) => MembersProvider(
+            context.read<MemberServices>(),
+          ),
+        ),
+
+        /// ================= LOCAL DB =================
         Provider<MemberService>.value(value: memberService),
-        Provider<PaymentService>.value(value: paymentService),
-        ChangeNotifierProvider<ThemeService>.value(value: themeService),
-        Provider<AuthService>(create: (_) => AuthService()),
-        Provider<DutyService>(create: (_) => DutyService()),
       ],
       child: Consumer<ThemeService>(
         builder: (context, themeService, child) {
@@ -75,10 +122,11 @@ class MyApp extends StatelessWidget {
               '/members': (context) => MemberListScreen(),
               '/members/add': (context) => AddMemberScreen(),
               '/payments': (context) => PaymentScreen(),
-              '/payments/history': (context) => const PaymentHistoryScreen(),
+              '/payments/history': (context) =>
+              const PaymentHistoryScreen(),
               '/duty/posts': (context) => DutyPostScreen(),
-              '/duty/roster': (context) => DutyRosterScreen(),
-              '/register': (context) => RegisterScreen(),
+              '/duty/roster': (context) => AddLocationScreen(),
+             // '/register': (context) => RegisterScreen(),
               '/login': (context) => LoginScreen(),
             },
           );

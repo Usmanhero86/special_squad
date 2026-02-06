@@ -1,8 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:special_squad/screens/members/sections/section_title.dart';
+import '../../models/location_location.dart';
+import '../../services/location_provider.dart';
 import 'guarantor_infoo.dart';
+import 'package:path/path.dart' as path;
 
 class AddMemberScreen extends StatefulWidget {
   const AddMemberScreen({super.key});
@@ -33,9 +38,19 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
   String? selectedGender;
   String? selectedUnitAreaType;
 
+  Location? _selectedLocation;
+  bool _isLoadingLocations = true;
   // Profile image
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
+  @override
+  void initState() {
+    super.initState();
+
+    Future.microtask(() {
+      context.read<LocationProvider>().loadLocations();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -125,18 +140,45 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
         // Location Section
         _buildLabel('Location'),
         const SizedBox(height: 4),
-        TextFormField(
-          controller: locationController,
-          decoration: InputDecoration(
-            hintText: 'Enter location',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4.0),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 16,
-            ),
-          ),
+
+        Consumer<LocationProvider>(
+          builder: (context, provider, _) {
+            if (provider.isFetching) {
+              return const LinearProgressIndicator();
+            }
+
+            if (provider.error != null) {
+              return Text(
+                'Failed to load locations',
+                style: TextStyle(color: Colors.red),
+              );
+            }
+
+            return DropdownButtonFormField<Location>(
+              value: _selectedLocation,
+              hint: const Text('Select location'),
+              items: provider.locations.map((location) {
+                return DropdownMenuItem<Location>(
+                  value: location,
+                  child: Text(location.name),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedLocation = value;
+                });
+              },
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
+                ),
+              ),
+            );
+          },
         ),
 
         const SizedBox(height: 16),
@@ -473,6 +515,8 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     );
   }
 
+  DateTime? selectedDob;
+
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -480,14 +524,15 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
+
     if (picked != null) {
       setState(() {
+        selectedDob = picked;
         dobController.text =
-            "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
+        "${picked.day}/${picked.month}/${picked.year}";
       });
     }
   }
-
   // Profile Picture Section
   Widget _buildProfilePictureSection() {
     return Center(
@@ -579,53 +624,56 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
 
   // Navigate to Guarantor Info with member data
   void _navigateToGuarantorInfo() {
-    // Validate required fields
-    if (fullNameController.text.trim().isEmpty) {
+    if (fullNameController.text.trim().isEmpty ||
+        phoneController.text.trim().isEmpty ||
+        selectedDob == null ||
+        selectedGender == null ||
+        selectedUnitAreaType == null ||
+        _selectedLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter full name'),
+          content: Text('Please complete all required fields'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    if (phoneController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter phone number'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Create member data map to pass to next screen
     final memberData = {
-      'fullName': fullNameController.text.trim(),
-      'idNo': idNoController.text.trim(),
-      'rifleNo': rifleNoController.text.trim(),
-      'tribe': tribeController.text.trim(),
-      'religion': religionController.text.trim(),
-      'dateOfBirth': dobController.text.trim(),
-      'phone': phoneController.text.trim(),
-      'location': locationController.text.trim(),
-      'address': addressController.text.trim(),
-      'maritalStatus': maritalController.text.trim(),
-      'position': positionController.text.trim(),
-      'ninNo': ninController.text.trim(),
-      'state': stateController.text.trim(),
-      'accountNo': accountController.text.trim(),
-      'unitArea': unitAreaController.text.trim(),
-      'gender': selectedGender,
-      'unitAreaType': selectedUnitAreaType,
-      'profileImage': _profileImage?.path,
-    };
+      "fullName": fullNameController.text.trim(),
+      "idNo": idNoController.text.trim(),
+      "rifleNo": rifleNoController.text.trim(),
+      "tribe": tribeController.text.trim(),
+      "religion": religionController.text.trim(),
+      "dateOfBirth": DateTime(
+        selectedDob!.year,
+        selectedDob!.month,
+        selectedDob!.day,
+      ).toUtc().toIso8601String(),
+      "phoneNumber": phoneController.text.trim(),
 
+      // ✅ LOCATION FROM DROPDOWN
+      // ✅ WHAT BACKEND EXPECTS
+      "location": _selectedLocation!.id,
+      "gender": selectedGender,
+      "permanentAddress": addressController.text.trim(),
+      "maritalStatus": maritalController.text.trim(),
+      "position": positionController.text.trim(),
+      "ninNo": ninController.text.trim(),
+      "state": stateController.text.trim(),
+      "accountNo": accountController.text.trim(),
+      "unitArea": unitAreaController.text.trim(),
+      "unitAreaType": selectedUnitAreaType,
+
+    };
+    print('✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅$memberData');
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => GuarantorInfoScreen(memberData: memberData),
+        builder: (_) => GuarantorInfoScreen(
+          memberData: memberData,
+          photoFile: _profileImage, // ✅ PASS FILE HERE
+        ),
       ),
     );
   }

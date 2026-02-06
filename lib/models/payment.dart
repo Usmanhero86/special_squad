@@ -10,6 +10,8 @@ class Payment {
   String status;
   String? notes;
   String? attachmentUrl;
+  String? memberName; // Added for API response
+  String? description; // Added for API response
 
   Payment({
     required this.id,
@@ -23,7 +25,29 @@ class Payment {
     this.status = 'Completed',
     this.notes,
     this.attachmentUrl,
+    this.memberName,
+    this.description,
   });
+
+  // Factory method for API response
+  factory Payment.fromJson(Map<String, dynamic> json) {
+    return Payment(
+      id: json['id'] ?? '',
+      memberId: json['memberId'] ?? '',
+      amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0.0,
+      paymentDate: json['paymentDate'] != null
+          ? DateTime.parse(json['paymentDate'])
+          : DateTime.now(),
+      paymentMethod: json['paymentMethod'] ?? 'CASH',
+      purpose: json['description'] ?? 'Payment',
+      receiptNumber: json['referenceNumber'],
+      bankReference: json['referenceNumber'],
+      status: json['paymentStatus'] ?? 'PENDING',
+      notes: json['description'],
+      memberName: json['member']?['fullName'],
+      description: json['description'],
+    );
+  }
 
   // Add these factory methods
   factory Payment.fromMap(Map<String, dynamic> data, String id) {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/member.dart';
+import '../../models/getAllMember.dart';
+import '../../models/member_overview.dart';
 import '../../services/member_service.dart';
+import '../../services/members.dart';
 import 'add_member_screen.dart';
 import 'member_detail_screen.dart';
 
@@ -14,41 +16,93 @@ class MemberListScreen extends StatefulWidget {
 
 class _MemberListScreenState extends State<MemberListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  List<Member> _allMembers = [];
-  List<Member> _filteredMembers = [];
+  List<Members> _allMembers = [];
+  List<Members> _filteredMembers = [];
   bool _isLoading = true;
+  bool _membersLoaded = false;
+  bool _overviewLoaded = false;
+  bool hasValidPhoto(String? photo) {
+    return photo != null &&
+        photo.isNotEmpty &&
+        photo.startsWith('http') &&
+        !photo.contains('example.com'); // 🚫 block fake URLs
+  }
+
+  int _page = 1;
+  final int _limit = 10;
+  MemberOverview? _overview;
+  bool _isOverviewLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _isLoading = true;
+    _membersLoaded = false;
+    _overviewLoaded = false;
+
     _loadMembers();
+    _loadOverview();
+
     _searchController.addListener(_onSearchChanged);
   }
 
+  void _updateLoadingState() {
+    if (_membersLoaded && _overviewLoaded) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadOverview() async {
+    try {
+      final memberService = context.read<MemberServices>();
+      final overview = await memberService.getMemberOverview();
+
+      if (!mounted) return;
+
+      _overview = overview;
+      _overviewLoaded = true;
+    } catch (e) {
+      debugPrint('OVERVIEW ERROR: $e');
+      _overviewLoaded = true;
+    } finally {
+      _updateLoadingState();
+    }
+  }
+
+  Future<void> _loadMembers() async {
+    try {
+      final memberService = context.read<MemberServices>();
+      final members = await memberService.getMembers(
+        page: _page,
+        limit: _limit,
+      );
+
+      if (!mounted) return;
+
+      _allMembers = members;
+      _filteredMembers = members;
+      _membersLoaded = true;
+    } catch (e) {
+      debugPrint('LOAD MEMBERS ERROR: $e');
+      _membersLoaded = true;
+    } finally {
+      _updateLoadingState();
+    }
+  }
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _loadMembers();
+  //   _loadOverview();
+  //   _searchController.addListener(_onSearchChanged);
+  // }
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadMembers() async {
-    final memberService = Provider.of<MemberService>(context, listen: false);
-    try {
-      final members = await memberService.getMembersSync();
-      if (mounted) {
-        setState(() {
-          _allMembers = members;
-          _filteredMembers = members;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
   }
 
   void _onSearchChanged() {
@@ -59,7 +113,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
       } else {
         _filteredMembers = _allMembers.where((member) {
           return member.fullName.toLowerCase().contains(query) ||
-              member.rifleNumber.toLowerCase().contains(query) ||
+              member.rifleNo.toLowerCase().contains(query) ||
               member.position.toLowerCase().contains(query) ||
               (member.location?.toLowerCase().contains(query) ?? false);
         }).toList();
@@ -67,9 +121,9 @@ class _MemberListScreenState extends State<MemberListScreen> {
     });
   }
 
-  int get _totalMembers => _allMembers.length;
-  int get _activeMembers => _allMembers.where((m) => m.isActive).length;
-  int get _inactiveMembers => _totalMembers - _activeMembers;
+  // int get _totalMembers => _allMembers.length;
+  // int get _activeMembers => _allMembers.where((m) => m.isActive).length;
+  // int get _inactiveMembers => _totalMembers - _activeMembers;
 
   @override
   Widget build(BuildContext context) {
@@ -168,39 +222,85 @@ class _MemberListScreenState extends State<MemberListScreen> {
               ),
             ),
           ),
-
-          // Statistics Cards
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    'Total',
-                    _totalMembers.toString(),
-                    'Total members',
+            child: _overview == null
+                ? const SizedBox.shrink()
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Total',
+                          _overview!.totalMembers.toString(),
+                          'Total members',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Active',
+                          _overview!.activeMembers.toString(),
+                          'Active members',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Inactive',
+                          _overview!.inactiveMembers.toString(),
+                          'Inactive members',
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildStatCard(
-                    'Total',
-                    _activeMembers.toString(),
-                    'Active members',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildStatCard(
-                    'Total',
-                    _inactiveMembers.toString(),
-                    'Inactive members',
-                  ),
-                ),
-              ],
-            ),
           ),
 
+          // Statistics Cards
+          // Container(
+          //   margin: const EdgeInsets.symmetric(horizontal: 20),
+          //   child: Row(
+          //     children: [
+          //       Container(
+          //         margin: const EdgeInsets.symmetric(horizontal: 20),
+          //         child: Row(
+          //           children: [
+          //             Expanded(
+          //               child: _buildStatCard(
+          //                 'Total',
+          //                 _totalMembers.toString(),
+          //                 'Total members',
+          //               ),
+          //             ),
+          //             ...
+          //           ],
+          //         ),
+          //       ),
+          //       // Expanded(
+          //       //   child: _buildStatCard(
+          //       //     'Total',
+          //       //     _totalMembers.toString,
+          //       //     'Total members',
+          //       //   ),
+          //       // ),
+          //       const SizedBox(width: 8),
+          //       // Expanded(
+          //       //   child: _buildStatCard(
+          //       //     'Active',
+          //       //     _activeMembers.toString(),
+          //       //     'Active members',
+          //       //   ),
+          //       // ),
+          //       const SizedBox(width: 8),
+          //       // Expanded(
+          //       //   child: _buildStatCard(
+          //       //     'Inactive',
+          //       //     _inactiveMembers.toString(),
+          //       //     'Inactive members',
+          //       //   ),
+          //       // ),
+          //     ],
+          //   ),
+          // ),
           const SizedBox(height: 20),
 
           // Content Area
@@ -367,35 +467,40 @@ class _MemberListScreenState extends State<MemberListScreen> {
 
   Widget _buildMembersList() {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       itemCount: _filteredMembers.length,
       itemBuilder: (context, index) {
         final member = _filteredMembers[index];
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
-              vertical: 8,
+              vertical: 1,
             ),
             leading: CircleAvatar(
               radius: 24,
               backgroundColor: Theme.of(
                 context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
-              backgroundImage: member.profileImage != null
-                  ? FileImage(member.profileImage as dynamic)
-                  : null,
-              child: member.profileImage == null
-                  ? Text(
-                      member.fullName.substring(0, 1).toUpperCase(),
+              ).colorScheme.primary.withOpacity(0.1),
+              child: hasValidPhoto(member.photo)
+                  ? ClipOval(
+                      child: Image.network(
+                        member.photo!,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Text(
+                      member.fullName.isNotEmpty
+                          ? member.fullName[0].toUpperCase()
+                          : '?',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
-                    )
-                  : null,
+                    ),
             ),
             title: Text(
               member.fullName,
@@ -405,7 +510,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ID: ${member.rifleNumber}',
+                  'ID: ${member.rifleNo}',
                   style: TextStyle(
                     fontSize: 14,
                     color: Theme.of(
