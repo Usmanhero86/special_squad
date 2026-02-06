@@ -1,223 +1,223 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:special_squad/screens/main_dashboard.dart';
-import '../../widgets/theme_toggle_button.dart';
+import '../../services/login.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: const [ThemeToggleButton()],
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo/Header
-                Container(
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withOpacity(0.2),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.group,
-                    size: 60,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                SizedBox(height: 32),
-
-                // Title
-                Text(
-                  'Organization Management',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade900,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Access your dashboard',
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-                ),
-                SizedBox(height: 40),
-
-                // Login Button Card
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Simple Login',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade800,
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Click the button below to access the dashboard directly',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        SizedBox(height: 24),
-
-                        // Login Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Navigate directly to dashboard
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => MainDashboard(),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: Colors.blue.shade700,
-                            ),
-                            child: Text(
-                              'Enter Dashboard',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: 32),
-
-                // Optional: Add feature highlights
-                Column(
-                  children: [
-                    FeatureItem(
-                      icon: Icons.people,
-                      title: 'Member Management',
-                      description: 'Add, view, and manage organization members',
-                    ),
-                    SizedBox(height: 16),
-                    FeatureItem(
-                      icon: Icons.assignment,
-                      title: 'Duty Posts',
-                      description: 'Create and assign duty posts to members',
-                    ),
-                    SizedBox(height: 16),
-                    FeatureItem(
-                      icon: Icons.payment,
-                      title: 'Payments',
-                      description: 'Track member payments and dues',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-// Helper widget for feature highlights
-class FeatureItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
-  const FeatureItem({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
+  final _formKey = GlobalKey<FormState>();
+
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  Future<void> handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // ✅ GET AuthService FROM PROVIDER
+      final authService = context.read<AuthService>();
+
+      await authService.login(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainDashboard()),
+      );
+    } catch (e) {
+      debugPrint('❌ LOGIN ERROR: $e');
+
+      setState(() {
+        _errorMessage =
+            e.toString().replaceAll('Exception:', '').trim();
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_errorMessage!)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 8,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Row(
+    final theme = Theme.of(context);
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: Stack(
         children: [
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.blue.shade700, size: 24),
-          ),
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
+          Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo/Header
+                  Container(
+                    padding: EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withOpacity(0.2),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.group,
+                      size: 60,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
+                  SizedBox(height: 32),
+
+                  // Title
+                  Text(
+                    'Organization Management',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade900,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Secretary Login',
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                  ),
+                  SizedBox(height: 20),
+
+                  // Login Button Card
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            Text(
+                              'Secretary Login',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade800,
+                              ),
+                            ),
+
+                            if (_errorMessage != null) ...[
+                              Text(
+                                _errorMessage!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            SizedBox(height: 16),
+                            TextFormField(
+                              controller: emailController,
+                              decoration: InputDecoration(
+                                hintText: 'Enter Email Address',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4.0),
+                                ),
+                              ),
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Email is required';
+                                }
+                                if (!value.contains('@')) {
+                                  return 'Enter a valid email';
+                                }
+                                return null;
+                              },
+                            ),
+                            SizedBox(height: 24),
+                            TextFormField(
+                              controller: passwordController,
+                              decoration: InputDecoration(
+                                hintText: 'Enter Password',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4.0),
+                                ),
+                              ),
+                              obscureText: true,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Password is required';
+                                }
+                                if (value.length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                return null;
+                              },
+                            ),
+                            SizedBox(height: 24),
+                            // Login Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : handleLogin,
+                                child: const Text('Login'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 32),
+
+                ],
+              ),
             ),
           ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
         ],
       ),
     );
   }
 }
+

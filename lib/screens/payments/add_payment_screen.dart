@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/payment.dart';
+import '../../models/membersDetails.dart';
 import '../../models/member.dart';
-import '../../services/member_service.dart';
-import '../../services/payment_service.dart';
+import '../../services/memberProvider.dart';
+import '../../services/members.dart';
+import '../../services/payment.dart';
 
 class AddPaymentScreen extends StatefulWidget {
-  const AddPaymentScreen({super.key});
+  final Member? preSelectedMember;
+  final double? defaultAmount;
+
+  const AddPaymentScreen({
+    super.key,
+    this.preSelectedMember,
+    this.defaultAmount,
+  });
 
   @override
   AddPaymentScreenState createState() => AddPaymentScreenState();
@@ -17,14 +25,15 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _receiptController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
-
+  // List<Members> _members = [];
+  // List<Members> _filteredMembers = [];
+  String? _selectedMemberId;
   DateTime _selectedDate = DateTime.now();
   String _selectedMethod = 'Cash';
   String _selectedPurpose = 'Salary';
-  String? _selectedMemberId;
   String? _selectedLocation;
-  List<Member> _members = [];
-  List<Member> _filteredMembers = [];
+  static const double MAX_PAYMENT_AMOUNT = 99999999.99;
+
   final List<String> _locations = [
     'HQ',
     'Marte',
@@ -42,7 +51,8 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
     'Damboa',
     'Gamboru',
   ];
-
+  MemberDetail? _selectedMemberDetail;
+  bool _loadingMember = false;
   final List<String> _paymentMethods = [
     'Cash',
     'Bank Transfer',
@@ -51,55 +61,48 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
   final List<String> _paymentPurposes = [
     'Salary',
     'Allowance',
-    'Membership Fee',
     'Other',
   ];
-
   @override
   void initState() {
     super.initState();
-    _loadMembers();
-  }
 
-  Future<void> _loadMembers() async {
-    final memberService = Provider.of<MemberService>(context, listen: false);
-    try {
-      final members = await memberService.getMembersSync();
-      if (mounted) {
-        setState(() {
-          _members = members;
-          _filteredMembers = members;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading members: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    // Set pre-selected member if provided
+    if (widget.preSelectedMember != null) {
+      _selectedMemberId = widget.preSelectedMember!.id;
     }
-  }
 
-  void _filterMembersByLocation(String? location) {
-    setState(() {
-      _selectedLocation = location;
-      _selectedMemberId = null; // Reset selected member when location changes
+    // Set default amount if provided
+    if (widget.defaultAmount != null) {
+      _amountController.text = widget.defaultAmount!.toStringAsFixed(0);
+    }
 
-      if (location == null || location.isEmpty) {
-        _filteredMembers = _members;
-      } else {
-        _filteredMembers = _members
-            .where((member) => member.location == location)
-            .toList();
-      }
+    Future.microtask(() {
+      final provider = context.read<MembersProvider>();
+      provider.load();
     });
   }
 
+  // Future<void> _loadMembers() async {
+  //   final memberService =
+  //   Provider.of<MemberServices>(context, listen: false);
+  //
+  //   final members = await memberService.getMembers(limit: 500);
+  //
+  //   setState(() {
+  //     _members = members.where((m) => m.isActive).toList();
+  //     _filteredMembers = _members;
+  //   });
+  // }
+
+
   @override
   Widget build(BuildContext context) {
+    final membersProvider = context.watch<MembersProvider>();
+
+    final activeMembers = membersProvider.members
+        .where((m) => m.isActive)
+        .toList();
     return Scaffold(
       appBar: AppBar(title: const Text('Record Payment')),
       body: SingleChildScrollView(
@@ -109,8 +112,6 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildLocationSelector(),
-              SizedBox(height: 20),
               _buildMemberSelector(),
               SizedBox(height: 20),
               _buildAmountField(),
@@ -121,7 +122,7 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
               SizedBox(height: 20),
               _buildPurposeSelector(),
               SizedBox(height: 20),
-              _buildReceiptField(),
+             // _buildReceiptField(),
               SizedBox(height: 20),
               _buildNotesField(),
               SizedBox(height: 30),
@@ -139,43 +140,13 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
     );
   }
 
-  Widget _buildLocationSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Location *',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedLocation,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please select a location';
-            }
-            return null;
-          },
-          hint: Text('Select location first'),
-          items: _locations
-              .map(
-                (location) =>
-                    DropdownMenuItem(value: location, child: Text(location)),
-              )
-              .toList(),
-          onChanged: (value) {
-            _filterMembersByLocation(value);
-          },
-        ),
-      ],
-    );
-  }
 
   Widget _buildMemberSelector() {
+    final membersProvider = context.watch<MembersProvider>();
+
+    final activeMembers = membersProvider.members
+        .where((m) => m.isActive)
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -196,77 +167,110 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
             }
             return null;
           },
-          hint: Text(
-            _selectedLocation == null
-                ? 'Select location first'
-                : _filteredMembers.isEmpty
-                ? 'No members in $_selectedLocation'
-                : 'Select a member from $_selectedLocation',
-          ),
-          items: _filteredMembers
-              .map(
+          hint: const Text('Select a member'),
+          items: activeMembers.map(
                 (member) => DropdownMenuItem(
-                  value: member.id,
-                  child: Row(
+              value: member.id,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 10,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1),
+                    backgroundImage: member.photo != null && member.photo!.isNotEmpty
+                        ? NetworkImage(member.photo!)
+                        : null,
+                    child: (member.photo == null || member.photo!.isEmpty)
+                        ? Text(
+                      member.fullName.substring(0, 1).toUpperCase(),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.1),
-                        backgroundImage: member.profileImage != null
-                            ? FileImage(member.profileImage as dynamic)
-                            : null,
-                        child: member.profileImage == null
-                            ? Text(
-                                member.fullName.substring(0, 1).toUpperCase(),
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              )
-                            : null,
+                      Text(
+                        member.fullName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              member.fullName,
-                              style: TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                            Text(
-                              member.location ?? 'No location',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+
                     ],
                   ),
+                ],
+              ),
+            ),
+          ).toList(),
+          onChanged: (value) async {
+            if (value == null) return;
+
+            setState(() {
+              _selectedMemberId = value;
+              _loadingMember = true;
+            });
+
+            try {
+              final memberService =
+              context.read<MemberServices>();
+
+              final detail =
+              await memberService.getMemberById(value);
+
+              if (!mounted) return;
+
+              setState(() {
+                _selectedMemberDetail = detail;
+              });
+            } catch (e) {
+              if (!mounted) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to load member details'),
+                  backgroundColor: Colors.red,
                 ),
-              )
-              .toList(),
-          onChanged: _selectedLocation == null
-              ? null
-              : (value) {
-                  setState(() {
-                    _selectedMemberId = value;
-                  });
-                },
+              );
+            } finally {
+              if (mounted) {
+                setState(() => _loadingMember = false);
+              }
+            }
+          },
+
         ),
-        if (_selectedLocation != null && _filteredMembers.isNotEmpty)
+        if (_loadingMember)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: LinearProgressIndicator(),
+          ),
+
+        if (_selectedMemberDetail != null)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '${_filteredMembers.length} member(s) in $_selectedLocation',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            padding: const EdgeInsets.only(top: 12),
+            child: Card(
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: _selectedMemberDetail!.photo != null &&
+                      _selectedMemberDetail!.photo!.isNotEmpty
+                      ? NetworkImage(_selectedMemberDetail!.photo!)
+                      : null,
+                  child: _selectedMemberDetail!.photo == null
+                      ? Text(
+                    _selectedMemberDetail!.fullName[0],
+                  )
+                      : null,
+                ),
+
+              ),
             ),
           ),
       ],
@@ -453,62 +457,91 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
       });
     }
   }
-
+  // ===============================
+  // SAVE PAYMENT (FULLY SAFE)
+  // ===============================
   Future<void> _savePayment() async {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedLocation == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select a location first'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
+    if (!_formKey.currentState!.validate()) return;
 
-      final paymentService = Provider.of<PaymentService>(
-        context,
-        listen: false,
-      );
-
-      final payment = Payment(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        memberId: _selectedMemberId!,
-        amount: double.parse(_amountController.text),
-        paymentDate: _selectedDate,
-        paymentMethod: _selectedMethod,
-        purpose: _selectedPurpose,
-        receiptNumber: _receiptController.text.isNotEmpty
-            ? _receiptController.text
-            : null,
-        notes: _notesController.text.isNotEmpty ? _notesController.text : null,
-        status: 'Completed',
-      );
-
-      try {
-        await paymentService.addPayment(payment, null);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Payment recorded successfully for $_selectedLocation',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pop(context);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error saving payment: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+    if (_selectedMemberId == null) {
+      _showError('Please select a member');
+      return;
     }
+
+    final amount = double.tryParse(_amountController.text);
+
+    if (amount == null) {
+      _showError('Invalid amount entered');
+      return;
+    }
+
+    // 🚫 FRONTEND HARD LIMIT
+    if (amount > MAX_PAYMENT_AMOUNT) {
+      _showError(
+        'Amount exceeds allowed limit (₦99,999,999.99).\nPlease enter a smaller amount.',
+      );
+      return;
+    }
+
+    final paymentService =
+    Provider.of<PaymentServices>(context, listen: false);
+
+    try {
+      String apiPaymentMethod;
+      switch (_selectedMethod) {
+        case 'Bank Transfer':
+          apiPaymentMethod = 'BANK_TRANSFER';
+          break;
+        case 'Mobile Money':
+          apiPaymentMethod = 'MOBILE_MONEY';
+          break;
+        default:
+          apiPaymentMethod = 'CASH';
+      }
+
+      const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+
+      final forMonth =
+          '${months[_selectedDate.month - 1]},${_selectedDate.year}';
+
+      await paymentService.makePayment(
+        memberId: _selectedMemberId!,
+        amount: amount,
+        purpose: _selectedPurpose,
+        paymentMethod: apiPaymentMethod,
+        note: _notesController.text.isNotEmpty ? _notesController.text : null,
+        forMonth: forMonth,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment recorded successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      _showError(e.toString().replaceAll('Exception:', '').trim());
+    }
+  }
+
+  // ===============================
+  // HELPERS
+  // ===============================
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 }

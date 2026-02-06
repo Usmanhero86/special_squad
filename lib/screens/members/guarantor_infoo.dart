@@ -1,14 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:special_squad/screens/members/sections/section_title.dart';
 import '../../models/member.dart';
 import '../../services/member_service.dart';
+import '../../services/members.dart';
 import 'member_list_screen.dart';
 
 class GuarantorInfoScreen extends StatefulWidget {
   final Map<String, dynamic> memberData;
+  final File? photoFile; // ✅ ADD THIS
 
-  const GuarantorInfoScreen({super.key, required this.memberData});
+  const GuarantorInfoScreen({super.key, required this.memberData, this.photoFile});
 
   @override
   State<GuarantorInfoScreen> createState() => _GuarantorInfoScreenState();
@@ -368,151 +372,74 @@ SectionTitle(title: 'Next of Kin',),
   }
 
   void _saveMembershipForm() async {
-    // Validate guarantor information
-    if (guarantorNameController.text.trim().isEmpty) {
+    // Basic validation
+    if (guarantorNameController.text.trim().isEmpty ||
+        guarantorPhoneController.text.trim().isEmpty ||
+        emergencyNameController.text.trim().isEmpty ||
+        nextOfKinNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter guarantor full name'),
+          content: Text('Please complete all required fields'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    if (guarantorPhoneController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter guarantor phone number'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    // ✅ MERGE DATA EXACTLY AS BACKEND EXPECTS
+    final payload = {
+      ...widget.memberData,
 
-    if (emergencyNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter emergency contact name'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+      // GUARANTOR
+      "guarantorFullName": guarantorNameController.text.trim(),
+      "guarantorRelationship":
+      guarantorRelationshipController.text.trim(),
+      "guarantorTribe": guarantorTribeController.text.trim(),
+      "guarantorPhoneNumber":
+      guarantorPhoneController.text.trim(),
 
-    if (nextOfKinNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter next of kin name'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+      // EMERGENCY CONTACT
+      "emergencyFullName": emergencyNameController.text.trim(),
+      "emergencyAddress": emergencyAddressController.text.trim(),
+      "emergencyPhoneNumber":
+      emergencyPhoneController.text.trim(),
 
+      // NEXT OF KIN
+      "nextOfKinFullName": nextOfKinNameController.text.trim(),
+      "nextOfKinAddress": nextOfKinAddressController.text.trim(),
+      "nextOfKinPhoneNumber":
+      nextOfKinPhoneController.text.trim(),
+    };
+    print('✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅$payload');
     try {
-      final memberService = Provider.of<MemberService>(context, listen: false);
+      final memberService = context.read<MemberServices>();
 
-      // Parse date of birth
-      DateTime dateOfBirth = DateTime.now();
-      if (widget.memberData['dateOfBirth'] != null &&
-          widget.memberData['dateOfBirth'].toString().isNotEmpty) {
-        try {
-          final dateParts = widget.memberData['dateOfBirth'].toString().split(
-            '/',
-          );
-          if (dateParts.length == 3) {
-            dateOfBirth = DateTime(
-              int.parse(dateParts[2]), // year
-              int.parse(dateParts[1]), // month
-              int.parse(dateParts[0]), // day
-            );
-          }
-        } catch (e) {
-          // Use current date if parsing fails
-          dateOfBirth = DateTime.now();
-        }
-      }
-
-      // Create comprehensive member data
-      final additionalInfo = {
-        'rifleNo': widget.memberData['rifleNo'] ?? '',
-        'gender': widget.memberData['gender'] ?? '',
-        'tribe': widget.memberData['tribe'] ?? '',
-        'religion': widget.memberData['religion'] ?? '',
-        'maritalStatus': widget.memberData['maritalStatus'] ?? '',
-        'ninNo': widget.memberData['ninNo'] ?? '',
-        'accountNo': widget.memberData['accountNo'] ?? '',
-        'state': widget.memberData['state'] ?? '',
-        'unitArea': widget.memberData['unitArea'] ?? '',
-        'unitAreaType': widget.memberData['unitAreaType'] ?? '',
-        'location': widget.memberData['location'] ?? '',
-        'guarantor': {
-          'fullname': guarantorNameController.text.trim(),
-          'relationship': guarantorRelationshipController.text.trim(),
-          'tribe': guarantorTribeController.text.trim(),
-          'phone': guarantorPhoneController.text.trim(),
-        },
-        'emergencyContact': {
-          'fullname': emergencyNameController.text.trim(),
-          'address': emergencyAddressController.text.trim(),
-          'phone': emergencyPhoneController.text.trim(),
-        },
-        'nextOfKin': {
-          'fullname': nextOfKinNameController.text.trim(),
-          'address': nextOfKinAddressController.text.trim(),
-          'phone': nextOfKinPhoneController.text.trim(),
-        },
-        'gcoSpecialSquad': selectedGCOSpecialSquad ?? '',
-      };
-
-      final member = Member(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        fullName: widget.memberData['fullName'] ?? '',
-        rifleNumber:
-            widget.memberData['rifleNo'] ?? widget.memberData['idNo'] ?? '',
-        phone: widget.memberData['phone'] ?? '',
-        dateOfBirth: dateOfBirth,
-        address: widget.memberData['address'] ?? '',
-        position: widget.memberData['position']?.isNotEmpty == true
-            ? widget.memberData['position']
-            : 'Member',
-        joinDate: DateTime.now(),
-        profileImage: widget.memberData['profileImage'],
-        additionalInfo: additionalInfo,
-        location: widget.memberData['location'],
+      await memberService.addMember(
+        payload: payload,
+        photoFile: widget.photoFile,
       );
 
-      // Save member to database
-      await memberService.addMember(member, null);
+      if (!mounted) return;
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Member "${member.fullName}" registered successfully!',
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Member registered successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
 
-        // Navigate to member list screen
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const MemberListScreen()),
-          (route) => route.isFirst, // Keep only the first route (dashboard)
-        );
-      }
+      Navigator.popUntil(context, (route) => route.isFirst);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error registering member: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceAll('Exception:', '').trim(),
           ),
-        );
-      }
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 }

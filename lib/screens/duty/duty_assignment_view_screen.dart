@@ -40,8 +40,9 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
 
     try {
       // Load duty posts and members
-      final posts = await dutyService.getDutyPosts();
-      final members = await memberService.getMembersSync();
+      final posts = await dutyService.getDutyPosts(
+        date: widget.selectedDate,
+      );      final members = await memberService.getMembersSync();
 
       // Create maps for quick lookup
       final postMap = <String, DutyPost>{};
@@ -187,17 +188,17 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (post.location != null &&
-                              post.location!.isNotEmpty)
-                            Text(
-                              post.location!,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.6),
-                              ),
-                            ),
+                          // if (post.location != null &&
+                          //     post.location!.isNotEmpty)
+                          //   Text(
+                          //     post.location!,
+                          //     style: TextStyle(
+                          //       fontSize: 14,
+                          //       color: Theme.of(
+                          //         context,
+                          //       ).colorScheme.onSurface.withValues(alpha: 0.6),
+                          //     ),
+                          //   ),
                         ],
                       ),
                     ),
@@ -224,19 +225,19 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                   ],
                 ),
 
-                if (post.description != null &&
-                    post.description!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    post.description!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
+                // if (post.description != null &&
+                //     post.description!.isNotEmpty) ...[
+                //   const SizedBox(height: 8),
+                //   Text(
+                //     post.description!,
+                //     style: TextStyle(
+                //       fontSize: 14,
+                //       color: Theme.of(
+                //         context,
+                //       ).colorScheme.onSurface.withValues(alpha: 0.7),
+                //     ),
+                //   ),
+                // ],
 
                 const SizedBox(height: 16),
                 const Divider(),

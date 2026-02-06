@@ -48,7 +48,7 @@ class MemberService {
     }
   }
 
-  Future<void> addMember(Member member, File? profileImage) async {
+  Future<void> addvMember(Member member, File? profileImage) async {
     // Ensure database is initialized
     if (!_initialized) {
       await initializeDatabase();

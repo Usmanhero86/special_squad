@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/duty_post.dart';
-import '../../models/member.dart';
+import '../../models/duty_roster.dart';
+import '../../models/duty_assignment.dart';
 import '../../services/duty_service.dart';
-import '../../services/member_service.dart';
 import '../../widgets/duty_post_card.dart';
-import '../../widgets/member_location_card.dart';
 import 'assign_duty_screen.dart';
 
 class DutyPostScreen extends StatefulWidget {
@@ -18,10 +17,13 @@ class DutyPostScreen extends StatefulWidget {
 class _DutyPostScreenState extends State<DutyPostScreen> {
   List<DutyPost> _dutyPosts = [];
   bool _isLoading = true;
-  List<Member> _membersByLocation = [];
-  List<String> _locations = [];
-  String? _selectedLocation;
-  int _selectedTab = 0;
+  DateTime _selectedDate = DateTime.now();
+  final Map<DateTime, List<DutyRoster>> _events = {};
+
+  // Pagination
+  int _currentPage = 1;
+  final int _limit = 10;
+  bool _hasMore = true;
 
   @override
   void initState() {
@@ -29,233 +31,108 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     _loadData();
   }
 
+  void _onDateChanged(DateTime newDate) {
+    if (newDate.year == _selectedDate.year &&
+        newDate.month == _selectedDate.month &&
+        newDate.day == _selectedDate.day) {
+      return; // ✅ same date → do nothing
+    }
+
+    setState(() {
+      _selectedDate = newDate;
+      _currentPage = 1;
+      _dutyPosts.clear();
+      _hasMore = true;
+      _isLoading = true;
+    });
+
+    _loadData(); // ✅ fetch ONLY when date actually changes
+  }
+
+  Future<void> _pickDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2030, 12, 31),
+    );
+
+    if (pickedDate != null) {
+      _onDateChanged(pickedDate);
+    }
+  }
+
   Future<void> _loadData() async {
     final dutyService = Provider.of<DutyService>(context, listen: false);
-    final memberService = Provider.of<MemberService>(context, listen: false);
+
+    setState(() => _isLoading = true);
 
     try {
-      final List<DutyPost> posts = await dutyService.getDutyPosts();
-      final List<String> locations = await memberService.getMemberLocations();
+      final posts = await dutyService.getDutyPosts(
+        page: _currentPage,
+        limit: _limit,
+        date: _selectedDate, // ✅ DATE PASSED
+      );
 
-      if (mounted) {
-        setState(() {
-          _dutyPosts = posts;
-          _locations = locations;
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _dutyPosts = posts;
+        _hasMore = posts.length >= _limit;
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
-      }
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+      );
     }
   }
 
-  Future<void> loadMembersByLocation(String location) async {
-    final memberService = Provider.of<MemberService>(context, listen: false);
+  Future<void> _loadMorePosts() async {
+    if (_isLoading || !_hasMore) return;
+
+    final dutyService = Provider.of<DutyService>(context, listen: false);
+    _currentPage++;
+
     try {
-      final members = await memberService.getMembersByLocation(location);
-      if (mounted) {
-        setState(() {
-          _membersByLocation = members;
-          _selectedLocation = location;
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load members: $e')));
-    }
+      final morePosts = await dutyService.getDutyPosts(
+        page: _currentPage,
+        limit: _limit,
+        date: _selectedDate, // ✅ DATE PASSED
+      );
+
+      setState(() {
+        _dutyPosts.addAll(morePosts);
+        _hasMore = morePosts.length >= _limit;
+      });
+    } catch (_) {}
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('Duty Posts'),
-          bottom: TabBar(
-            onTap: (index) {
-              setState(() {
-                _selectedTab = index;
-              });
-            },
-            tabs: [
-              Tab(text: 'Duty Posts'),
-              Tab(text: 'Members by Location'),
-            ],
-          ),
-        ),
-        body: _isLoading
-            ? Center(child: CircularProgressIndicator())
-            : TabBarView(
-                children: [
-                  // Tab 1: Duty Posts
-                  dutyPostsTab(),
-
-                  // Tab 2: Members by Location
-                  membersByLocationTab(),
-                ],
-              ),
-      ),
-    );
-  }
-
-  // Keep as method - depends on state
-  Widget dutyPostsTab() {
-    return _dutyPosts.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.work_off, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'No duty posts available',
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
-                ),
-                SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: addDutyPost,
-                  child: Text('Add First Duty Post'),
-                ),
-              ],
-            ),
-          )
-        : ListView.builder(
-            itemCount: _dutyPosts.length,
-            itemBuilder: (context, index) {
-              final post = _dutyPosts[index];
-              return DutyPostCard(
-                post: post,
-                onTap: () => showDutyPostDetails(post),
-                onEdit: () => editDutyPost(post),
-                onDelete: () => deleteDutyPost(post),
-              );
-            },
-          );
-  }
-
-  // Keep as method - depends on state
-  Widget membersByLocationTab() {
-    return Column(
-      children: [
-        // Location Filter
-        Padding(
-          padding: EdgeInsets.all(16),
-          child: DropdownButtonFormField<String>(
-            initialValue: _selectedLocation,
-            decoration: InputDecoration(
-              labelText: 'Select Location',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.location_on),
-            ),
-            items: [
-              DropdownMenuItem(value: null, child: Text('All Locations')),
-              ..._locations.map((location) {
-                return DropdownMenuItem(value: location, child: Text(location));
-              }),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                loadMembersByLocation(value);
-              } else {
-                setState(() {
-                  _selectedLocation = null;
-                  _membersByLocation = [];
-                });
-              }
-            },
-          ),
-        ),
-
-        // Members List
-        Expanded(
-          child: _selectedLocation == null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.location_on, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
-                        'Select a location to view members',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                )
-              : _membersByLocation.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.people, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
-                        'No members found for $_selectedLocation',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: _membersByLocation.length,
-                  itemBuilder: (context, index) {
-                    final member = _membersByLocation[index];
-                    return MemberLocationCard(
-                      member: member,
-                      onAssignDuty: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AssignDutyScreen(
-                              dutyPostId: null,
-                              preSelectedMemberId: member.id,
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-  void addDutyPost() {
+  void _showAddDutyPostDialog() {
     final nameController = TextEditingController();
-    final locationController = TextEditingController();
     final descriptionController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add New Duty Post'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add Duty Post'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nameController,
-                decoration: InputDecoration(labelText: 'Post Name *'),
+                decoration: const InputDecoration(
+                  labelText: 'Post Name *',
+                  hintText: 'Enter post name',
+                ),
               ),
-              SizedBox(height: 8),
-              TextField(
-                controller: locationController,
-                decoration: InputDecoration(labelText: 'Location'),
-              ),
-              SizedBox(height: 8),
+              const SizedBox(height: 16),
               TextField(
                 controller: descriptionController,
-                decoration: InputDecoration(labelText: 'Description'),
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                  hintText: 'Enter description',
+                ),
                 maxLines: 3,
               ),
             ],
@@ -263,84 +140,319 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => _saveDutyPost(
-              nameController.text,
-              locationController.text,
-              descriptionController.text,
-            ),
-            child: Text('Save'),
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Post name is required'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              final dutyService =
+                  Provider.of<DutyService>(context, listen: false);
+
+              try {
+                debugPrint('🟡 ADD DUTY POST STARTED');
+                debugPrint('📤 POST NAME: $name');
+
+                final post = await dutyService.addDutyPost(name);
+
+                debugPrint('✅ DUTY POST CREATED: ${post.id}');
+
+                if (!mounted) return;
+
+                setState(() {
+                  _dutyPosts.insert(0, post); // Add to beginning of list
+                });
+
+                Navigator.pop(dialogContext);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Duty post "$name" created successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e, s) {
+                debugPrint('❌ ADD DUTY POST ERROR: $e');
+                debugPrint(s.toString());
+
+                if (!mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to create duty post: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Add'),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _saveDutyPost(
-    String name,
-    String location,
-    String description,
-  ) async {
-    if (name.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Post name is required')));
-      return;
-    }
+  String _getWeekdayName(int weekday) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[weekday - 1];
+  }
 
-    final dutyService = Provider.of<DutyService>(context, listen: false);
-    final newPost = DutyPost(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name.trim(),
-      location: location.trim().isEmpty ? null : location.trim(),
-      description: description.trim().isEmpty ? null : description.trim(),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Duty Posts'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              setState(() {
+                _currentPage = 1;
+              });
+              _loadData();
+            },
+            tooltip: 'Refresh',
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_location_alt),
+            onPressed: _showAddDutyPostDialog,
+            tooltip: 'Add Duty Post',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Date header
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withValues(alpha: 0.3),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () {
+                        _onDateChanged(
+                          _selectedDate.subtract(const Duration(days: 1)),
+                        );
+                      },
+                    ),
+                    GestureDetector(
+                      onTap: _pickDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () {
+                        _onDateChanged(
+                          _selectedDate.add(const Duration(days: 1)),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              // Week view
+              SizedBox(
+                height: 80,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: 7,
+                  itemBuilder: (context, index) {
+                    final date = _selectedDate.subtract(
+                      Duration(days: _selectedDate.weekday - 1 - index),
+                    );
+                    final isSelected = date.day == _selectedDate.day &&
+                        date.month == _selectedDate.month &&
+                        date.year == _selectedDate.year;
+                    final dateKey = DateTime(date.year, date.month, date.day);
+                    final hasEvents = _events.containsKey(dateKey) &&
+                        _events[dateKey]!.isNotEmpty;
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedDate = date;
+                        });
+                      },
+                      child: Container(
+                        width: 60,
+                        margin: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : hasEvents
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .secondary
+                                      .withValues(alpha: 0.3)
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _getWeekdayName(date.weekday),
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.onSurface,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              '${date.day}',
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.onSurface,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (hasEvents)
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.onPrimary
+                                      : Theme.of(context).colorScheme.secondary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          // Duty posts list
+          Expanded(
+            child: _isLoading && _dutyPosts.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : dutyPostsTab(),
+          ),
+        ],
+      ),
     );
+  }
 
-    try {
-      await dutyService.addDutyPost(newPost);
-      Navigator.pop(context);
-      _loadData(); // Refresh the list
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Duty post added successfully')));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to add duty post: $e')));
+  Widget dutyPostsTab() {
+    if (_dutyPosts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.work_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              'No duty posts available',
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _showAddDutyPostDialog,
+              child: const Text('Add First Duty Post'),
+            ),
+          ],
+        ),
+      );
     }
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (ScrollNotification scrollInfo) {
+        if (!_isLoading &&
+            _hasMore &&
+            scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
+          _loadMorePosts();
+        }
+        return false;
+      },
+      child: ListView.builder(
+        itemCount: _dutyPosts.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _dutyPosts.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          final post = _dutyPosts[index];
+          return DutyPostCard(
+            post: post,
+            onTap: () => showDutyPostDetails(post),
+            onEdit: () => editDutyPost(post),
+            onDelete: () => deleteDutyPost(post),
+          );
+        },
+      ),
+    );
   }
 
   void editDutyPost(DutyPost post) {
     final nameController = TextEditingController(text: post.name);
-    final locationController = TextEditingController(text: post.location ?? '');
-    final descriptionController = TextEditingController(
-      text: post.description ?? '',
-    );
+    final descriptionController = TextEditingController(text: post.description ?? '');
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Edit Duty Post'),
+        title: const Text('Edit Duty Post'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nameController,
-                decoration: InputDecoration(labelText: 'Post Name *'),
+                decoration: const InputDecoration(labelText: 'Post Name *'),
               ),
-              SizedBox(height: 8),
-              TextField(
-                controller: locationController,
-                decoration: InputDecoration(labelText: 'Location'),
-              ),
-              SizedBox(height: 8),
+              const SizedBox(height: 16),
               TextField(
                 controller: descriptionController,
-                decoration: InputDecoration(labelText: 'Description'),
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                ),
                 maxLines: 3,
               ),
             ],
@@ -349,149 +461,456 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => updateDutyPost(
-              post,
-              nameController.text,
-              locationController.text,
-              descriptionController.text,
-            ),
-            child: Text('Update'),
+            onPressed: () {
+              // TODO: Implement update functionality when API is available
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Update functionality coming soon'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            },
+            child: const Text('Update'),
           ),
         ],
       ),
     );
-  }
-
-  Future<void> updateDutyPost(
-    DutyPost post,
-    String name,
-    String location,
-    String description,
-  ) async {
-    if (name.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Post name is required')));
-      return;
-    }
-
-    final dutyService = Provider.of<DutyService>(context, listen: false);
-    final updatedPost = post.copyWith(
-      name: name.trim(),
-      location: location.trim().isEmpty ? null : location.trim(),
-      description: description.trim().isEmpty ? null : description.trim(),
-    );
-
-    try {
-      await dutyService.updateDutyPost(updatedPost);
-      Navigator.pop(context);
-      _loadData(); // Refresh the list
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Duty post updated successfully')));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to update duty post: $e')));
-    }
   }
 
   void deleteDutyPost(DutyPost post) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Duty Post'),
+        title: const Text('Delete Duty Post'),
         content: Text('Are you sure you want to delete "${post.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => confirmDeleteDutyPost(post),
+            onPressed: () {
+              // TODO: Implement delete functionality when API is available
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Delete functionality coming soon'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text('Delete'),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
   }
 
-  Future<void> confirmDeleteDutyPost(DutyPost post) async {
+  void showDutyPostDetails(DutyPost post) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DutyPostDetailsSheet(post: post),
+      ),
+    );
+  }
+}
+
+// Separate widget for duty post details with assigned members
+class DutyPostDetailsSheet extends StatefulWidget {
+  final DutyPost post;
+
+  const DutyPostDetailsSheet({super.key, required this.post});
+
+  @override
+  State<DutyPostDetailsSheet> createState() => _DutyPostDetailsSheetState();
+}
+
+class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
+  List<DutyAssignment> _assignedMembers = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAssignedMembers();
+  }
+
+  Future<void> _loadAssignedMembers() async {
     final dutyService = Provider.of<DutyService>(context, listen: false);
 
     try {
-      await dutyService.deleteDutyPost(post.id);
-      Navigator.pop(context);
-      _loadData(); // Refresh the list
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Duty post deleted successfully')));
+      final assignments = await dutyService.getAssignedMembers(widget.post.id);
+
+      if (mounted) {
+        setState(() {
+          _assignedMembers = assignments;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to delete duty post: $e')));
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load assigned members: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
-  void showDutyPostDetails(DutyPost post) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: EdgeInsets.all(16),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(  appBar: AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: const Text('Duty Post Details'),
+    ),
+      body: Container(
+        height: MediaQuery.of(context).size.height * 1,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              post.name,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            if (post.location != null && post.location!.isNotEmpty) ...[
-              Text(
-                'Location: ${post.location!}',
-                style: TextStyle(fontSize: 16),
-              ),
-              SizedBox(height: 8),
-            ],
-            if (post.description != null && post.description!.isNotEmpty) ...[
-              Text(
-                'Description:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(post.description!),
-              SizedBox(height: 8),
-            ],
-            SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Close'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            AssignDutyScreen(dutyPostId: post.id),
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.work,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.post.name,
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Duty Post',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+      
+                    // Description
+                    if (widget.post.description != null && widget.post.description!.isNotEmpty) ...[
+                      Text(
+                        'Description',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
-                    );
-                  },
-                  child: Text('Assign Duty'),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          widget.post.description!,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                    //
+                    // Assigned Members Section
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Assigned Members',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        if (!_isLoading)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${_assignedMembers.length}',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+      
+                    // Assigned Members List
+                    if (_isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_assignedMembers.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 48,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No members assigned yet',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._assignedMembers.map((assignment) => _buildMemberCard(context, assignment)),
+      
+                    const SizedBox(height: 12),
+      
+                    // Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AssignDutyScreen(
+                                dutyPostId: widget.post.id,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.assignment_ind),
+                        label: const Text('Assign Duty'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMemberCard(BuildContext context, DutyAssignment assignment) {
+    final member = assignment.member;
+    final assignmentDate = DateTime.tryParse(assignment.day);
+    final formattedDate = assignmentDate != null
+        ? '${assignmentDate.day}/${assignmentDate.month}/${assignmentDate.year}'
+        : assignment.day;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Profile Picture
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            backgroundImage: member.hasPhoto ? NetworkImage(member.displayPhoto) : null,
+            child: !member.hasPhoto
+                ? Text(
+                    member.fullName.substring(0, 1).toUpperCase(),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 16),
+          // Member Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  member.fullName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (member.rifleNo != null)
+                  Text(
+                    'Rifle No: ${member.rifleNo}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 14,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      formattedDate,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Status Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: member.status == 'ACTIVE'
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : Colors.grey.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: member.status == 'ACTIVE' ? Colors.green : Colors.grey,
+                width: 1,
+              ),
+            ),
+            child: Text(
+              member.status,
+              style: TextStyle(
+                color: member.status == 'ACTIVE' ? Colors.green : Colors.grey,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

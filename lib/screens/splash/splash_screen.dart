@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../auth/login_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const OnboardingScreen(),
+                const LoginScreen(),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
                   return FadeTransition(opacity: animation, child: child);
@@ -91,20 +92,17 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ),
                         child: ClipOval(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Image.asset(
-                              'lib/assets/Screenshot 2026-01-30 142441.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                // Fallback to icon if image fails to load
-                                return const Icon(
-                                  Icons.security,
-                                  size: 80,
-                                  color: Color(0xFFD4AF37),
-                                );
-                              },
-                            ),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            fit: BoxFit.fill,
+                            errorBuilder: (context, error, stackTrace) {
+                              // Fallback to icon if image fails to load
+                              return const Icon(
+                                Icons.security,
+                                size: 80,
+                                color: Color(0xFFD4AF37),
+                              );
+                            },
                           ),
                         ),
                       ),

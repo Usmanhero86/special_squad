@@ -1,40 +1,27 @@
 class DutyPost {
-  String id;
-  String name;
-  String? description;
-  String? location;
+  final String id;
+  final String name;
+  final String? description;
 
-  DutyPost({required this.id, required this.name, this.description, this.location,});
+  DutyPost({
+    required this.id,
+    required this.name,
+    this.description,
+  });
 
-  factory DutyPost.fromMap(Map<String, dynamic> data, String id) {
+  factory DutyPost.fromJson(Map<String, dynamic> json) {
     return DutyPost(
-      id: id,
-      name: data['name'] ?? '',
-      description: data['description'],
-      location: data['location'],
+      id: json['id'] ?? '',
+      name: json['postName'] ?? '',
+      description: json['description'],
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
-      'name': name,
+      'id': id,
+      'postName': name,
       'description': description,
-      'location': location,
-      'createdAt': DateTime.now().millisecondsSinceEpoch,
     };
-  }
-
-  DutyPost copyWith({
-    String? id,
-    String? name,
-    String? description,
-    String? location,
-  }) {
-    return DutyPost(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      description: description ?? this.description,
-      location: location ?? this.location,
-    );
   }
 }

@@ -4,7 +4,7 @@ import 'package:special_squad/screens/payments/payments_screen.dart';
 import './members/add_member_screen.dart';
 import './members/member_list_screen.dart';
 import './duty/duty_post_screen.dart';
-import './duty/duty_roster_screen.dart';
+import 'location/location.dart';
 import './payments/payment_history_screen.dart';
 import './profile/profile_screen.dart';
 import '../widgets/dashboard_card.dart';
@@ -31,7 +31,7 @@ class DashboardScreen extends StatelessWidget {
             icon: const Icon(Icons.person),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              MaterialPageRoute(builder: (context) => const AddMemberScreen()),
             ),
             tooltip: 'Profile',
           ),
@@ -79,7 +79,7 @@ class DashboardScreen extends StatelessWidget {
             subtitle: 'Schedule duties',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => DutyRosterScreen()),
+              MaterialPageRoute(builder: (context) => AddLocationScreen()),
             ),
           ),
           DashboardCard(
@@ -97,10 +97,13 @@ class DashboardScreen extends StatelessWidget {
             title: 'Payment History',
             color: Colors.red,
             subtitle: 'View all payments',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PaymentHistoryScreen()),
-            ),
+            onTap: () {
+              // Navigator.push(
+              //   context,
+              //   MaterialPageRoute(builder: (context) => PaymentHistoryScreen()),
+              // )
+              // ,
+            }
           ),
           DashboardCard(
             icon: Icons.bar_chart,
@@ -116,7 +119,7 @@ class DashboardScreen extends StatelessWidget {
             subtitle: 'View profile',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              MaterialPageRoute(builder: (context) => const AddMemberScreen()),
             ),
           ),
         ],
@@ -158,10 +161,10 @@ class DashboardScreen extends StatelessWidget {
               title: Text('Record Payment'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => AddPaymentScreen()),
-                );
+                // Navigator.push(
+                //   context,
+                //   MaterialPageRoute(builder: (context) => AddPaymentScreen()),
+                // );
               },
             ),
             ListTile(

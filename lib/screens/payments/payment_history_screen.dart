@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/payment.dart';
 import '../../models/member.dart';
-import '../../services/payment_service.dart';
-import '../../services/member_service.dart';
+import '../../models/paymentListMembers.dart';
+import '../../models/payment_detail.dart';
+import '../../services/payment.dart';
 import '../../widgets/theme_toggle_button.dart';
-import 'payment_details_sheet.dart';
 
 class PaymentHistoryScreen extends StatefulWidget {
   const PaymentHistoryScreen({super.key});
@@ -19,10 +19,24 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
   List<PaymentHistoryRecord> _paymentHistory = [];
   List<PaymentHistoryRecord> _filteredHistory = [];
   final TextEditingController _searchController = TextEditingController();
-  bool _isLoading = true;
   String? _selectedLocation;
   String _selectedStatus = 'All';
   DateTimeRange? _selectedDateRange;
+  bool _isFetchingPayments = true;
+  // =======================
+// PAGED API STATE (ADD THIS)
+// =======================
+  int _pageFromApi = 1;
+  int _limitFromApi = 10;
+
+  bool _isLoading = true;
+  double _totalAmountFromApi = 0;
+  int _totalRecordsFromApi = 0;
+
+  String? _selectedMonth;
+// Raw payments from API
+  List<Payments> _payments = [];
+  bool _isFetchingHistory = true;
   final List<String> _locations = [
     'All Locations',
     'HQ',
@@ -49,15 +63,38 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     'Pending',
   ];
 
+  List<Payments> _filteredPayments = [];
+  // Generate list of months (current month and previous 11 months)
+  List<Map<String, String>> _generateMonths() {
+    final now = DateTime.now();
+    final months = <Map<String, String>>[];
+
+    for (int i = 0; i < 12; i++) {
+      final date = DateTime(now.year, now.month - i, 1);
+      final monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+
+      months.add({
+        'label': '${monthNames[date.month - 1]} ${date.year}',
+        'value': '${monthNames[date.month - 1]},${date.year}',
+      });
+    }
+
+    return months;
+  }
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _selectedLocation = _locations.first;
-    _loadPaymentHistory();
+
+    _loadPaymentRecords();   // ✅ REQUIRED
+    _loadPaymentHistory();   // (optional for summary)
+
     _searchController.addListener(_filterHistory);
   }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -74,57 +111,37 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
   }
 
   Future<void> _loadPaymentHistory() async {
-    final paymentService = Provider.of<PaymentService>(context, listen: false);
-    final memberService = Provider.of<MemberService>(context, listen: false);
+    setState(() {
+      _isFetchingHistory = true;
+    });
 
     try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Load all payments and members
-      final payments = await paymentService.getPaymentsSync();
-      final members = await memberService.getMembersSync();
-
-      // Create a map for quick member lookup
-      final memberMap = {for (var member in members) member.id: member};
-
-      // Create payment history records
       final historyRecords = <PaymentHistoryRecord>[];
 
-      for (final payment in payments) {
-        final member = memberMap[payment.memberId];
-        if (member != null) {
-          historyRecords.add(
-            PaymentHistoryRecord(payment: payment, member: member),
-          );
-        }
-      }
-
-      // Sort by payment date (most recent first)
       historyRecords.sort(
-        (a, b) => b.payment.paymentDate.compareTo(a.payment.paymentDate),
+            (a, b) => b.payment.paymentDate.compareTo(a.payment.paymentDate),
       );
 
-      if (mounted) {
-        setState(() {
-          _paymentHistory = historyRecords;
-          _filteredHistory = historyRecords;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _paymentHistory = historyRecords;
+        _filteredHistory = historyRecords;
+        _isFetchingHistory = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading payment history: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _isFetchingHistory = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading payment history: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -188,6 +205,46 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     return grouped;
   }
 
+  Future<void> _loadPaymentRecords() async {
+    final paymentService =
+    Provider.of<PaymentServices>(context, listen: false);
+
+    setState(() {
+      _isFetchingPayments = true;
+    });
+
+    try {
+      final response = await paymentService.getPayments(
+        page: _pageFromApi,
+        limit: _limitFromApi,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _payments = response.payments;
+        _filteredPayments = response.payments;
+
+        _totalAmountFromApi = response.totalAmount;
+        _totalRecordsFromApi = response.total;
+        _pageFromApi = response.page;
+        _limitFromApi = response.limit;
+
+        _isFetchingPayments = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isFetchingPayments = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -216,16 +273,133 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
 
           // Summary Card
           _buildSummaryCard(),
-
-          // Payment History List
+          // Payment Records List
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredHistory.isEmpty
+            child: _isFetchingPayments
+                ? const Center(
+              child: CircularProgressIndicator(),
+            )
+                : _filteredPayments.isEmpty
                 ? _buildEmptyState()
-                : _buildHistoryList(),
+                : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _filteredPayments.length,
+              itemBuilder: (context, index) {
+                final record = _filteredPayments[index];
+                return _buildPaymentRecordTile(record);
+              },
+            ),
           ),
         ],
+      ),
+    );
+  }
+  Widget _buildPaymentRecordTile(Payments record) {
+    final isPaid =
+        record.status.toLowerCase() == 'paid' ||
+            record.status.toLowerCase() == 'completed';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 12),
+          ],
+        ),
+        title: Text(
+          record.memberName,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isPaid ? 'Paid' : 'Unpaid',
+              style: TextStyle(
+                fontSize: 14,
+                color: isPaid ? Colors.green : Colors.red,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '₦${record.amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isPaid ? Colors.green : Colors.red,
+              ),
+            ),
+            const SizedBox(width: 8),
+            PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_vert,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'view',
+                  child: Row(
+                    children: [
+                      Icon(Icons.visibility, size: 20),
+                      SizedBox(width: 8),
+                      Text('View Details'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: isPaid ? 'mark_unpaid' : 'mark_paid',
+                  child: Row(
+                    children: [
+                      Icon(
+                        isPaid ? Icons.cancel : Icons.check_circle,
+                        size: 20,
+                        color: isPaid ? Colors.red : Colors.green,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(isPaid ? 'Mark as Unpaid' : 'Mark as Paid'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 20),
+                      SizedBox(width: 8),
+                      Text('Edit Payment'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 20, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+              onSelected: (value) {
+                if (value == 'view') {
+                  _showPaymentDetailsById(record.id);
+                }
+              },
+            ),
+          ],
+        ),
+        onTap: () => _showPaymentDetailsById(record.id),
       ),
     );
   }
@@ -260,104 +434,40 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
           // Filter Row
           Row(
             children: [
-              // Location Filter
               Expanded(
-                flex: 2,
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedLocation,
-                  decoration: InputDecoration(
-                    labelText: 'Location',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedMonth,
+                    decoration: InputDecoration(
+                      labelText: 'Select Month',
+                      prefixIcon: const Icon(Icons.calendar_month),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
+                    items: _generateMonths()
+                        .map(
+                          (month) => DropdownMenuItem(
+                        value: month['value'],
+                        child: Text(month['label']!),
+                      ),
+                    )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedMonth = value;
+                          _isLoading = true;
+                        });
+                        _loadPaymentRecords();
+                      }
+                    },
                   ),
-                  isExpanded: true,
-                  items: _locations
-                      .map(
-                        (location) => DropdownMenuItem(
-                          value: location,
-                          child: Text(
-                            location,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedLocation = value;
-                    });
-                    _filterHistory();
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Status Filter
-              Expanded(
-                flex: 1,
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedStatus,
-                  decoration: InputDecoration(
-                    labelText: 'Status',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                  ),
-                  isExpanded: true,
-                  items: _statusOptions
-                      .map(
-                        (status) => DropdownMenuItem(
-                          value: status,
-                          child: Text(
-                            status,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedStatus = value!;
-                    });
-                    _filterHistory();
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Date Range Filter
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.outline.withValues(alpha: 0.5),
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.date_range,
-                    size: 20,
-                    color: _selectedDateRange != null
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                  onPressed: _pickDateRange,
-                  tooltip: 'Date Range',
                 ),
               ),
             ],
@@ -439,14 +549,16 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
             children: [
               _buildSummaryItem(
                 'Total Amount',
-                '₦${_totalAmount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                '₦${_totalAmountFromApi.toStringAsFixed(0).replaceAllMapped(
+                  RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                      (m) => '${m[1]},',
+                )}',
                 Colors.green,
               ),
-              _buildSummaryItem('Paid', '$paidCount', Colors.green),
-              _buildSummaryItem('Unpaid', '$unpaidCount', Colors.red),
+
               _buildSummaryItem(
                 'Total Records',
-                '${_filteredHistory.length}',
+                '$_totalRecordsFromApi',
                 Colors.blue,
               ),
             ],
@@ -702,7 +814,7 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
             ),
           ],
         ),
-        onTap: () => _showPaymentDetails(record),
+        onTap: () => _showPaymentDetails(record.payment),
       ),
     );
   }
@@ -726,41 +838,75 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  void _showPaymentDetails(PaymentHistoryRecord record) {
+  void _showPaymentDetails(Payment payment) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Expanded(
-              child: PaymentDetailsSheet(
-                payment: record.payment,
-                parentContext: context,
-              ),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: PaymentDetailsSheetFromHistory(payment: payment),
+        );
+      },
     );
   }
+
+  Future<void> _showPaymentDetailsById(String paymentId) async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final paymentService = Provider.of<PaymentServices>(context, listen: false);
+      final paymentDetail = await paymentService.getPaymentById(paymentId);
+
+      if (!mounted) return;
+
+      // Close loading indicator
+      Navigator.of(context).pop();
+
+      // Show payment details
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: PaymentDetailSheet(paymentDetail: paymentDetail),
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close loading indicator
+      Navigator.of(context).pop();
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading payment details: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
 }
 
 // Helper class to combine payment and member data for history
@@ -769,4 +915,390 @@ class PaymentHistoryRecord {
   final Member member;
 
   PaymentHistoryRecord({required this.payment, required this.member});
+}
+class PaymentDetailsSheetHistory extends StatelessWidget {
+  final Payments payment;
+
+  const PaymentDetailsSheetHistory({
+    super.key,
+    required this.payment,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _header(context),
+          const SizedBox(height: 16),
+          _detailRow('Amount', '₦${payment.amount}'),
+          _detailRow('Status', payment.status),
+          _detailRow('Method', payment.method),
+          _detailRow('Reference', payment.memberName),
+          const SizedBox(height: 24),
+          _actions(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    return Text(
+      'Payment Details',
+      style: Theme.of(context)
+          .textTheme
+          .titleLarge
+          ?.copyWith(fontWeight: FontWeight.bold),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+          Text(value),
+        ],
+      ),
+    );
+  }
+
+  Widget _actions(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Close'),
+      ),
+    );
+  }
+}
+class PaymentDetailsSheetFromHistory extends StatelessWidget {
+  final Payment payment;
+
+  const PaymentDetailsSheetFromHistory({
+    super.key,
+    required this.payment,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Payment Details',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          _row('Amount', '₦${payment.amount}'),
+          _row('Status', payment.status),
+          _row('Purpose', payment.purpose),
+          _row('Method', payment.paymentMethod),
+          _row('Date', payment.paymentDate.toString()),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+          Text(value),
+        ],
+      ),
+    );
+  }
+}
+
+// New widget for detailed payment information from API
+class PaymentDetailSheet extends StatelessWidget {
+  final PaymentDetail paymentDetail;
+
+  const PaymentDetailSheet({
+    super.key,
+    required this.paymentDetail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPaid = paymentDetail.isCompleted;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Payment Details',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Status Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isPaid
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : Colors.orange.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isPaid ? Colors.green : Colors.orange,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isPaid ? Icons.check_circle : Icons.pending,
+                  color: isPaid ? Colors.green : Colors.orange,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  paymentDetail.paymentStatus,
+                  style: TextStyle(
+                    color: isPaid ? Colors.green : Colors.orange,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Amount Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).colorScheme.primary,
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Amount Paid',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '₦${paymentDetail.amountAsDouble.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Payment Information
+          _buildSectionTitle(context, 'Payment Information'),
+          const SizedBox(height: 12),
+          _buildDetailRow(
+            context,
+            'Reference Number',
+            paymentDetail.referenceNumber,
+            Icons.receipt_long,
+          ),
+          _buildDetailRow(
+            context,
+            'Payment Method',
+            paymentDetail.paymentMethod,
+            Icons.payment,
+          ),
+          _buildDetailRow(
+            context,
+            'Payment Date',
+            _formatDateTime(paymentDetail.paymentDate),
+            Icons.calendar_today,
+          ),
+          const SizedBox(height: 24),
+
+          // Description
+          if (paymentDetail.description.isNotEmpty) ...[
+            _buildSectionTitle(context, 'Description'),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                paymentDetail.description,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Additional Information
+          _buildSectionTitle(context, 'Additional Information'),
+          const SizedBox(height: 12),
+          _buildDetailRow(
+            context,
+            'Member ID',
+            paymentDetail.memberId,
+            Icons.person,
+          ),
+          _buildDetailRow(
+            context,
+            'Recorded By',
+            paymentDetail.recordedById,
+            Icons.person_outline,
+          ),
+          _buildDetailRow(
+            context,
+            'Created At',
+            _formatDateTime(paymentDetail.createdAt),
+            Icons.access_time,
+          ),
+          _buildDetailRow(
+            context,
+            'Updated At',
+            _formatDateTime(paymentDetail.updatedAt),
+            Icons.update,
+          ),
+          const SizedBox(height: 32),
+
+          // Close Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Close',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
 }
