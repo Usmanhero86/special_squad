@@ -332,9 +332,10 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
         child: ElevatedButton(
           onPressed: _canAssignDuty() ? _assignDuty : null,
           style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          child: const Text('Assign Duty'),
+          child: const Text('Assign Duty', style: TextStyle(color: Colors.white),),
         ),
       ),
     );
