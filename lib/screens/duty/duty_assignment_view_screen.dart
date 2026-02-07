@@ -187,17 +187,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          // if (post.location != null &&
-                          //     post.location!.isNotEmpty)
-                          //   Text(
-                          //     post.location!,
-                          //     style: TextStyle(
-                          //       fontSize: 14,
-                          //       color: Theme.of(
-                          //         context,
-                          //       ).colorScheme.onSurface.withValues(alpha: 0.6),
-                          //     ),
-                          //   ),
+                          
                         ],
                       ),
                     ),
@@ -224,19 +214,7 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                   ],
                 ),
 
-                // if (post.description != null &&
-                //     post.description!.isNotEmpty) ...[
-                //   const SizedBox(height: 8),
-                //   Text(
-                //     post.description!,
-                //     style: TextStyle(
-                //       fontSize: 14,
-                //       color: Theme.of(
-                //         context,
-                //       ).colorScheme.onSurface.withValues(alpha: 0.7),
-                //     ),
-                //   ),
-                // ],
+                
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 8),
