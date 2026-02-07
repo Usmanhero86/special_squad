@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+
 import '../core/api_client.dart';
 import '../models/payment.dart';
+import '../models/payment_detail.dart';
 import '../models/payment_member.dart';
+import '../models/payment_response.dart';
 
 class PaymentService {
   final ApiClient api;
@@ -33,8 +36,7 @@ class PaymentService {
 
     final data = jsonDecode(response.body);
 
-    if (response.statusCode != 200 ||
-        data['responseSuccessful'] != true) {
+    if (response.statusCode != 200 || data['responseSuccessful'] != true) {
       throw Exception(
         data['responseMessage'] ?? 'Failed to fetch payment members',
       );
@@ -42,6 +44,68 @@ class PaymentService {
 
     final List list = data['responseBody']['data'] ?? [];
     return list.map((e) => PaymentMember.fromJson(e)).toList();
+  }
+
+  /// ==============================
+  /// GET ALL PAYMENTS
+  /// ==============================
+  Future<List<Payment>> getAllPayments({int page = 1, int limit = 100}) async {
+    final path = '/api/v1/admin/payment?page=$page&limit=$limit';
+
+    debugPrint('🟡 FETCHING PAYMENTS');
+    debugPrint('📍 PATH: $path');
+
+    final response = await api.get(path);
+
+    debugPrint('📥 STATUS: ${response.statusCode}');
+    debugPrint('📥 BODY: ${response.body}');
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || data['responseSuccessful'] != true) {
+      throw Exception(data['responseMessage'] ?? 'Failed to fetch payments');
+    }
+
+    final List list = data['responseBody']['data'] ?? [];
+    return list.map((e) => Payment.fromJson(e)).toList();
+  }
+
+  /// ==============================
+  /// GET PAYMENTS (PAGINATED)
+  /// ==============================
+  Future<PaymentPagedResponse> getPayments({
+    int page = 1,
+    int limit = 10,
+    String? month,
+    String? year,
+  }) async {
+    debugPrint('🟡 FETCHING PAYMENTS');
+
+    // Build query parameters
+    final queryParams = <String>['page=$page', 'limit=$limit'];
+
+    if (month != null && year != null) {
+      queryParams.add('month=$month,$year');
+      debugPrint('📅 FILTERING BY: $month $year');
+    }
+
+    final queryString = queryParams.join('&');
+    final endpoint = '/api/v1/admin/payment?$queryString';
+
+    debugPrint('📍 ENDPOINT: $endpoint');
+
+    final response = await api.get(endpoint);
+
+    debugPrint('📥 STATUS: ${response.statusCode}');
+    debugPrint('📥 BODY: ${response.body}');
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || data['responseSuccessful'] != true) {
+      throw Exception(data['responseMessage']);
+    }
+
+    return PaymentPagedResponse.fromJson(data);
   }
 
   /// ==============================
@@ -65,15 +129,34 @@ class PaymentService {
 
     final data = jsonDecode(response.body);
 
-    if (response.statusCode != 200 ||
-        data['responseSuccessful'] != true) {
-      throw Exception(
-        data['responseMessage'] ?? 'Failed to fetch payments',
-      );
+    if (response.statusCode != 200 || data['responseSuccessful'] != true) {
+      throw Exception(data['responseMessage'] ?? 'Failed to fetch payments');
     }
 
     final List list = data['responseBody']['data'] ?? [];
     return list.map((e) => Payment.fromJson(e)).toList();
+  }
+
+  /// ==============================
+  /// GET PAYMENT BY ID
+  /// ==============================
+  Future<PaymentDetail> getPaymentById(String paymentId) async {
+    debugPrint('🟡 FETCHING PAYMENT BY ID: $paymentId');
+
+    final response = await api.get('/api/v1/admin/payment/$paymentId');
+
+    debugPrint('📥 STATUS: ${response.statusCode}');
+    debugPrint('📥 BODY: ${response.body}');
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || data['responseSuccessful'] != true) {
+      throw Exception(
+        data['responseMessage'] ?? 'Failed to fetch payment details',
+      );
+    }
+
+    return PaymentDetail.fromJson(data['responseBody']);
   }
 
   /// ==============================
@@ -99,12 +182,54 @@ class PaymentService {
 
     final data = jsonDecode(response.body);
 
-    if ((response.statusCode != 200 &&
-        response.statusCode != 201) ||
+    if ((response.statusCode != 200 && response.statusCode != 201) ||
         data['responseSuccessful'] != true) {
-      throw Exception(
-        data['responseMessage'] ?? 'Failed to add payment',
-      );
+      throw Exception(data['responseMessage'] ?? 'Failed to add payment');
+    }
+  }
+
+  /// ==============================
+  /// MAKE PAYMENT
+  /// ==============================
+  Future<void> makePayment({
+    required String memberId,
+    required double amount,
+    required String purpose,
+    required String paymentMethod,
+    String? note,
+    required String forMonth,
+  }) async {
+    final payload = {
+      'memberId': memberId,
+      'amount': amount,
+      'purpose': purpose,
+      'paymentMethod': paymentMethod.toUpperCase(),
+      'note': note ?? '',
+      'forMonth': forMonth,
+    };
+
+    debugPrint('📤 PAYMENT PAYLOAD: $payload');
+
+    final response = await api.post('/api/v1/admin/payment/pay', body: payload);
+
+    debugPrint('📥 STATUS: ${response.statusCode}');
+    debugPrint('📥 BODY: ${response.body}');
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final message = data['responseMessage']?.toString() ?? '';
+
+      // 🔥 HANDLE DB NUMERIC OVERFLOW (12 BILLION ISSUE)
+      if (message.contains('numeric field overflow') ||
+          message.contains('precision 10') ||
+          message.contains('10^8')) {
+        throw Exception(
+          'Amount exceeds allowed limit. Maximum allowed is ₦99,999,999.99',
+        );
+      }
+
+      throw Exception(message.isNotEmpty ? message : 'Payment failed');
     }
   }
 
@@ -127,12 +252,9 @@ class PaymentService {
     debugPrint('📥 STATUS: ${response.statusCode}');
     debugPrint('📥 BODY: ${response.body}');
 
-    if (response.statusCode != 200 &&
-        response.statusCode != 201) {
+    if (response.statusCode != 200 && response.statusCode != 201) {
       final data = jsonDecode(response.body);
-      throw Exception(
-        data['responseMessage'] ?? 'Failed to update payment',
-      );
+      throw Exception(data['responseMessage'] ?? 'Failed to update payment');
     }
   }
 }

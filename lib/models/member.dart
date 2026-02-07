@@ -32,7 +32,7 @@ class Member {
     return Member(
       id: id,
       fullName: data['fullName'] ?? '',
-      rifleNumber: data['rifleNumber'] ?? '', // Updated field name
+      rifleNumber: data['rifleNumber'] ?? '', 
       phone: data['phone'] ?? '',
       dateOfBirth: DateTime.fromMillisecondsSinceEpoch(data['dateOfBirth']),
       address: data['address'] ?? '',

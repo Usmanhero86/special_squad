@@ -17,9 +17,7 @@ class DutyService {
   Future<DutyPost> addDutyPost(String postName) async {
     final response = await api.post(
       '/api/v1/admin/duty',
-      body: {
-        'postName': postName,
-      },
+      body: {'postName': postName},
     );
 
     final data = jsonDecode(response.body);
@@ -57,9 +55,7 @@ class DutyService {
     final data = jsonDecode(response.body);
 
     if (response.statusCode != 200 || data['responseSuccessful'] != true) {
-      throw Exception(
-        data['responseMessage'] ?? 'Failed to fetch duty posts',
-      );
+      throw Exception(data['responseMessage'] ?? 'Failed to fetch duty posts');
     }
 
     final List list = data['responseBody']['data'] ?? [];
@@ -70,8 +66,7 @@ class DutyService {
   /// GET ASSIGNED MEMBERS
   /// ===============================
   Future<List<DutyAssignment>> getAssignedMembers(String dutyPostId) async {
-    final response =
-    await api.get('/api/v1/admin/duty/assign/$dutyPostId');
+    final response = await api.get('/api/v1/admin/duty/assign/$dutyPostId');
 
     final data = jsonDecode(response.body);
 
@@ -135,5 +130,139 @@ class DutyService {
     }
 
     return true;
+  }
+
+  /// ===============================
+  /// DELETE DUTY POST
+  /// ===============================
+  Future<void> deleteDutyPost(String dutyPostId) async {
+    debugPrint('🟡 DELETING DUTY POST: $dutyPostId');
+
+    try {
+      final response = await api.delete('/api/v1/admin/duty/$dutyPostId');
+
+      debugPrint('📥 DELETE STATUS: ${response.statusCode}');
+      debugPrint('📥 DELETE BODY: ${response.body}');
+
+      // Some APIs return 204 No Content for successful deletion
+      if (response.statusCode == 204) {
+        debugPrint('✅ Duty post deleted successfully (204 No Content)');
+        return;
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          data['responseMessage'] ?? 'Failed to delete duty post',
+        );
+      }
+
+      if (data['responseSuccessful'] != true) {
+        throw Exception(data['responseMessage'] ?? 'Delete request failed');
+      }
+
+      debugPrint('✅ Duty post deleted successfully');
+    } catch (e) {
+      debugPrint('🔥 DELETE DUTY POST ERROR: $e');
+      rethrow;
+    }
+  }
+
+  /// ===============================
+  /// UPDATE DUTY POST
+  /// ===============================
+  Future<DutyPost> updateDutyPost({
+    required String dutyPostId,
+    required String postName,
+    String? description,
+  }) async {
+    debugPrint('🟡 UPDATING DUTY POST: $dutyPostId');
+    debugPrint('📤 POST NAME: $postName');
+    debugPrint('📤 DESCRIPTION: $description');
+
+    try {
+      final response = await api.patch(
+        '/api/v1/admin/duty/$dutyPostId',
+        body: {
+          'postName': postName,
+          if (description != null && description.isNotEmpty)
+            'description': description,
+        },
+      );
+
+      debugPrint('📥 UPDATE STATUS: ${response.statusCode}');
+      debugPrint('📥 UPDATE BODY: ${response.body}');
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception(
+          data['responseMessage'] ?? 'Failed to update duty post',
+        );
+      }
+
+      if (data['responseSuccessful'] != true) {
+        throw Exception(data['responseMessage'] ?? 'Update request failed');
+      }
+
+      debugPrint('✅ Duty post updated successfully');
+      return DutyPost.fromJson(data['responseBody']);
+    } catch (e) {
+      debugPrint('🔥 UPDATE DUTY POST ERROR: $e');
+      rethrow;
+    }
+  }
+
+  /// ===============================
+  /// DELETE DUTY ASSIGNMENT
+  /// ===============================
+  Future<void> deleteDutyAssignment(String assignmentId) async {
+    debugPrint('🟡 DELETING DUTY ASSIGNMENT: $assignmentId');
+
+    try {
+      // Use the correct endpoint: /api/v1/admin/duty/assign/{assignmentId}
+      final response = await api.delete(
+        '/api/v1/admin/duty/assign/$assignmentId',
+      );
+
+      debugPrint('📥 DELETE ASSIGNMENT STATUS: ${response.statusCode}');
+      debugPrint('📥 DELETE ASSIGNMENT BODY: ${response.body}');
+
+      // Handle HTML error responses (like 404 pages)
+      if (response.body.trim().startsWith('<!DOCTYPE html>') ||
+          response.body.trim().startsWith('<html')) {
+        debugPrint('🔥 Server returned HTML error page instead of JSON');
+        debugPrint(
+          '🔥 This usually means the endpoint does not exist or method is not allowed',
+        );
+        throw Exception(
+          'API endpoint not found. Please verify the endpoint is: DELETE /api/v1/admin/duty/assign/{assignmentId}',
+        );
+      }
+
+      // Some APIs return 204 No Content for successful deletion
+      if (response.statusCode == 204) {
+        debugPrint('✅ Duty assignment deleted successfully (204 No Content)');
+        return;
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          data['responseMessage'] ?? 'Failed to delete duty assignment',
+        );
+      }
+
+      if (data['responseSuccessful'] != true) {
+        throw Exception(data['responseMessage'] ?? 'Delete request failed');
+      }
+
+      debugPrint('✅ Duty assignment deleted successfully');
+    } catch (e) {
+      debugPrint('🔥 DELETE DUTY ASSIGNMENT ERROR: $e');
+      rethrow;
+    }
   }
 }

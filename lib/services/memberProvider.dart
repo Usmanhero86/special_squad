@@ -1,10 +1,10 @@
 import 'package:flutter/cupertino.dart';
 
 import '../models/getAllMember.dart';
-import 'members.dart';
+import 'member_service.dart';
 
 class MembersProvider extends ChangeNotifier {
-  final MemberServices service;
+  final MemberService service;
 
   MembersProvider(this.service);
 

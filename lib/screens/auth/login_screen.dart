@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:special_squad/screens/main_dashboard.dart';
 import '../../services/login.dart';
+import '../../core/api_client.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,13 +29,21 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      debugPrint('🟡 LOGIN ATTEMPT STARTED');
+      debugPrint('📧 Email: ${emailController.text.trim()}');
+      debugPrint('🔗 API Base URL: https://api.cjtf.buzz');
+
       // ✅ GET AuthService FROM PROVIDER
       final authService = context.read<AuthService>();
+
+      debugPrint('🟡 Calling authService.login...');
 
       await authService.login(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
+
+      debugPrint('✅ LOGIN SUCCESS - Navigating to dashboard');
 
       if (!mounted) return;
 
@@ -44,15 +53,31 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       debugPrint('❌ LOGIN ERROR: $e');
+      debugPrint('❌ ERROR TYPE: ${e.runtimeType}');
+
+      String errorMessage;
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('TimeoutException') ||
+          e.toString().contains('HandshakeException')) {
+        errorMessage =
+            'Network error. Please check your internet connection and try again.';
+      } else if (e.toString().contains('FormatException')) {
+        errorMessage = 'Server response error. Please try again later.';
+      } else {
+        errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      }
 
       setState(() {
-        _errorMessage =
-            e.toString().replaceAll('Exception:', '').trim();
+        _errorMessage = errorMessage;
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_errorMessage!)),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {
@@ -62,6 +87,65 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _testConnection() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      debugPrint('🟡 TESTING CONNECTION...');
+
+      final apiClient = context.read<ApiClient>();
+
+      // Test a simple endpoint or the login endpoint with dummy data
+      final response = await apiClient.post(
+        '/api/v1/admin/auth/login',
+        body: {'email': 'test@test.com', 'password': 'test123'},
+      );
+
+      debugPrint('✅ CONNECTION TEST - Status: ${response.statusCode}');
+      debugPrint('📥 CONNECTION TEST - Body: ${response.body}');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Connection successful! Status: ${response.statusCode}',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ CONNECTION TEST ERROR: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _bypassLogin() async {
+    debugPrint('🟡 BYPASSING LOGIN FOR DEVELOPMENT');
+
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MainDashboard()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         BoxShadow(
                           color: Theme.of(
                             context,
-                          ).colorScheme.primary.withOpacity(0.2),
+                          ).colorScheme.primary.withValues(alpha: 0.2),
                           blurRadius: 10,
                           spreadRadius: 2,
                         ),
@@ -110,11 +194,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Secretary Login',
-                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-                  ),
+                  // SizedBox(height: 8),
+                  // Text(
+                  //   'Secretary Login',
+                  //   style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                  // ),
                   SizedBox(height: 20),
 
                   // Login Button Card
@@ -130,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           children: [
                             Text(
-                              'Secretary Login',
+                              'Enter Login Details Below',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -193,8 +277,42 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: double.infinity,
                               height: 50,
                               child: ElevatedButton(
+                                style: ButtonStyle(
+                                  backgroundColor: WidgetStatePropertyAll(
+                                    Colors.blue,
+                                  ),
+                                ),
                                 onPressed: _isLoading ? null : handleLogin,
-                                child: const Text('Login'),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Login',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Test connection button
+                            TextButton(
+                              onPressed: _isLoading ? null : _testConnection,
+                              child: const Text('Test Connection'),
+                            ),
+                            // Temporary bypass for testing
+                            TextButton(
+                              onPressed: _isLoading ? null : _bypassLogin,
+                              child: const Text(
+                                'Skip Login (Development)',
+                                style: TextStyle(color: Colors.orange),
                               ),
                             ),
                           ],
@@ -203,7 +321,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   SizedBox(height: 32),
-
                 ],
               ),
             ),
@@ -211,13 +328,10 @@ class _LoginScreenState extends State<LoginScreen> {
           if (_isLoading)
             Container(
               color: Colors.black.withOpacity(0.3),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: const Center(child: CircularProgressIndicator()),
             ),
         ],
       ),
     );
   }
 }
-

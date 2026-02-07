@@ -1,4 +1,3 @@
-import 'location.dart';
 import 'location_location.dart';
 
 class AddLocationResponse {

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:special_squad/services/member_service.dart';
+import 'package:special_squad/services/payment_service.dart';
 import '../../models/membersDetails.dart';
 import '../../models/member.dart';
 import '../../services/memberProvider.dart';
-import '../../services/members.dart';
-import '../../services/payment.dart';
 
 class AddPaymentScreen extends StatefulWidget {
   final Member? preSelectedMember;
@@ -23,7 +23,6 @@ class AddPaymentScreen extends StatefulWidget {
 class AddPaymentScreenState extends State<AddPaymentScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _receiptController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   // List<Members> _members = [];
   // List<Members> _filteredMembers = [];
@@ -31,26 +30,8 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
   DateTime _selectedDate = DateTime.now();
   String _selectedMethod = 'Cash';
   String _selectedPurpose = 'Salary';
-  String? _selectedLocation;
   static const double MAX_PAYMENT_AMOUNT = 99999999.99;
 
-  final List<String> _locations = [
-    'HQ',
-    'Marte',
-    'Baga',
-    'Sabon gari',
-    'Mallum fatori',
-    'Dikwa',
-    'Ngala',
-    'Mafa',
-    'Rann',
-    'Kala Balge',
-    'Gwoza',
-    'Askira',
-    'Biu',
-    'Damboa',
-    'Gamboru',
-  ];
   MemberDetail? _selectedMemberDetail;
   bool _loadingMember = false;
   final List<String> _paymentMethods = [
@@ -58,11 +39,7 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
     'Bank Transfer',
     'Mobile Money',
   ];
-  final List<String> _paymentPurposes = [
-    'Salary',
-    'Allowance',
-    'Other',
-  ];
+  final List<String> _paymentPurposes = ['Salary', 'Allowance', 'Other'];
   @override
   void initState() {
     super.initState();
@@ -95,14 +72,8 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
   //   });
   // }
 
-
   @override
   Widget build(BuildContext context) {
-    final membersProvider = context.watch<MembersProvider>();
-
-    final activeMembers = membersProvider.members
-        .where((m) => m.isActive)
-        .toList();
     return Scaffold(
       appBar: AppBar(title: const Text('Record Payment')),
       body: SingleChildScrollView(
@@ -122,7 +93,7 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
               SizedBox(height: 20),
               _buildPurposeSelector(),
               SizedBox(height: 20),
-             // _buildReceiptField(),
+              // _buildReceiptField(),
               SizedBox(height: 20),
               _buildNotesField(),
               SizedBox(height: 30),
@@ -139,7 +110,6 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
       ),
     );
   }
-
 
   Widget _buildMemberSelector() {
     final membersProvider = context.watch<MembersProvider>();
@@ -168,48 +138,49 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
             return null;
           },
           hint: const Text('Select a member'),
-          items: activeMembers.map(
+          items: activeMembers
+              .map(
                 (member) => DropdownMenuItem(
-              value: member.id,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 10,
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
-                    backgroundImage: member.photo != null && member.photo!.isNotEmpty
-                        ? NetworkImage(member.photo!)
-                        : null,
-                    child: (member.photo == null || member.photo!.isEmpty)
-                        ? Text(
-                      member.fullName.substring(0, 1).toUpperCase(),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    )
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                  value: member.id,
+                  child: Row(
                     children: [
-                      Text(
-                        member.fullName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      CircleAvatar(
+                        radius: 10,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1),
+                        backgroundImage:
+                            member.photo != null && member.photo!.isNotEmpty
+                            ? NetworkImage(member.photo!)
+                            : null,
+                        child: (member.photo == null || member.photo!.isEmpty)
+                            ? Text(
+                                member.fullName.substring(0, 1).toUpperCase(),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              )
+                            : null,
                       ),
-
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            member.fullName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ).toList(),
+                ),
+              )
+              .toList(),
           onChanged: (value) async {
             if (value == null) return;
 
@@ -219,11 +190,9 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
             });
 
             try {
-              final memberService =
-              context.read<MemberServices>();
+              final memberService = context.read<MemberService>();
 
-              final detail =
-              await memberService.getMemberById(value);
+              final detail = await memberService.getMemberById(value);
 
               if (!mounted) return;
 
@@ -245,7 +214,6 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
               }
             }
           },
-
         ),
         if (_loadingMember)
           const Padding(
@@ -259,17 +227,15 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
             child: Card(
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundImage: _selectedMemberDetail!.photo != null &&
-                      _selectedMemberDetail!.photo!.isNotEmpty
+                  backgroundImage:
+                      _selectedMemberDetail!.photo != null &&
+                          _selectedMemberDetail!.photo!.isNotEmpty
                       ? NetworkImage(_selectedMemberDetail!.photo!)
                       : null,
                   child: _selectedMemberDetail!.photo == null
-                      ? Text(
-                    _selectedMemberDetail!.fullName[0],
-                  )
+                      ? Text(_selectedMemberDetail!.fullName[0])
                       : null,
                 ),
-
               ),
             ),
           ),
@@ -403,26 +369,6 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
     );
   }
 
-  Widget _buildReceiptField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Receipt Number (Optional)',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        SizedBox(height: 8),
-        TextFormField(
-          controller: _receiptController,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Enter receipt number',
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildNotesField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -457,6 +403,7 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
       });
     }
   }
+
   // ===============================
   // SAVE PAYMENT (FULLY SAFE)
   // ===============================
@@ -483,8 +430,7 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
       return;
     }
 
-    final paymentService =
-    Provider.of<PaymentServices>(context, listen: false);
+    final paymentService = Provider.of<PaymentService>(context, listen: false);
 
     try {
       String apiPaymentMethod;
@@ -500,8 +446,18 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
       }
 
       const months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
 
       final forMonth =

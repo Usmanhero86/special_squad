@@ -1,10 +1,12 @@
 class DutyAssignment {
+  final String id;
   final String memberId;
   final AssignedMember member;
   final String day;
   final String assignmentId;
 
   DutyAssignment({
+    required this.id,
     required this.memberId,
     required this.member,
     required this.day,
@@ -13,15 +15,17 @@ class DutyAssignment {
 
   factory DutyAssignment.fromJson(Map<String, dynamic> json) {
     return DutyAssignment(
+      id: json['id'] ?? json['assignmentId'] ?? '',
       memberId: json['memberId'] ?? '',
       member: AssignedMember.fromJson(json['member'] ?? {}),
       day: json['day'] ?? '',
-      assignmentId: json['assignmentId'] ?? '',
+      assignmentId: json['assignmentId'] ?? json['id'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'memberId': memberId,
       'member': member.toJson(),
       'day': day,

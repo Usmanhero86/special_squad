@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:special_squad/services/payment_service.dart';
 import '../../models/payment.dart';
 import '../../models/member.dart';
 import '../../models/paymentListMembers.dart';
 import '../../models/payment_detail.dart';
-import '../../services/payment.dart';
 import '../../widgets/theme_toggle_button.dart';
 
 class PaymentHistoryScreen extends StatefulWidget {
@@ -20,12 +20,12 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
   List<PaymentHistoryRecord> _filteredHistory = [];
   final TextEditingController _searchController = TextEditingController();
   String? _selectedLocation;
-  String _selectedStatus = 'All';
+  final String _selectedStatus = 'All';
   DateTimeRange? _selectedDateRange;
   bool _isFetchingPayments = true;
   // =======================
-// PAGED API STATE (ADD THIS)
-// =======================
+  // PAGED API STATE (ADD THIS)
+  // =======================
   int _pageFromApi = 1;
   int _limitFromApi = 10;
 
@@ -34,7 +34,7 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
   int _totalRecordsFromApi = 0;
 
   String? _selectedMonth;
-// Raw payments from API
+  // Raw payments from API
   List<Payments> _payments = [];
   bool _isFetchingHistory = true;
   final List<String> _locations = [
@@ -72,8 +72,18 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     for (int i = 0; i < 12; i++) {
       final date = DateTime(now.year, now.month - i, 1);
       final monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
 
       months.add({
@@ -84,17 +94,19 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
 
     return months;
   }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _selectedLocation = _locations.first;
 
-    _loadPaymentRecords();   // ✅ REQUIRED
-    _loadPaymentHistory();   // (optional for summary)
+    _loadPaymentRecords(); 
+    _loadPaymentHistory(); 
 
     _searchController.addListener(_filterHistory);
   }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -119,7 +131,7 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
       final historyRecords = <PaymentHistoryRecord>[];
 
       historyRecords.sort(
-            (a, b) => b.payment.paymentDate.compareTo(a.payment.paymentDate),
+        (a, b) => b.payment.paymentDate.compareTo(a.payment.paymentDate),
       );
 
       if (!mounted) return;
@@ -206,17 +218,30 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
   }
 
   Future<void> _loadPaymentRecords() async {
-    final paymentService =
-    Provider.of<PaymentServices>(context, listen: false);
+    final paymentService = Provider.of<PaymentService>(context, listen: false);
 
     setState(() {
       _isFetchingPayments = true;
     });
 
     try {
+      // Parse selected month if available
+      String? month;
+      String? year;
+
+      if (_selectedMonth != null) {
+        final parts = _selectedMonth!.split(',');
+        if (parts.length == 2) {
+          month = parts[0]; // e.g., "January"
+          year = parts[1]; // e.g., "2026"
+        }
+      }
+
       final response = await paymentService.getPayments(
         page: _pageFromApi,
         limit: _limitFromApi,
+        month: month,
+        year: year,
       );
 
       if (!mounted) return;
@@ -231,17 +256,19 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
         _limitFromApi = response.limit;
 
         _isFetchingPayments = false;
+        _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
         _isFetchingPayments = false;
+        _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -276,28 +303,27 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
           // Payment Records List
           Expanded(
             child: _isFetchingPayments
-                ? const Center(
-              child: CircularProgressIndicator(),
-            )
+                ? const Center(child: CircularProgressIndicator())
                 : _filteredPayments.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _filteredPayments.length,
-              itemBuilder: (context, index) {
-                final record = _filteredPayments[index];
-                return _buildPaymentRecordTile(record);
-              },
-            ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _filteredPayments.length,
+                    itemBuilder: (context, index) {
+                      final record = _filteredPayments[index];
+                      return _buildPaymentRecordTile(record);
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
+
   Widget _buildPaymentRecordTile(Payments record) {
     final isPaid =
         record.status.toLowerCase() == 'paid' ||
-            record.status.toLowerCase() == 'completed';
+        record.status.toLowerCase() == 'completed';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -305,9 +331,7 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Row(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(width: 12),
-          ],
+          children: [const SizedBox(width: 12)],
         ),
         title: Text(
           record.memberName,
@@ -453,10 +477,10 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
                     items: _generateMonths()
                         .map(
                           (month) => DropdownMenuItem(
-                        value: month['value'],
-                        child: Text(month['label']!),
-                      ),
-                    )
+                            value: month['value'],
+                            child: Text(month['label']!),
+                          ),
+                        )
                         .toList(),
                     onChanged: (value) {
                       if (value != null) {
@@ -549,10 +573,7 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
             children: [
               _buildSummaryItem(
                 'Total Amount',
-                '₦${_totalAmountFromApi.toStringAsFixed(0).replaceAllMapped(
-                  RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                      (m) => '${m[1]},',
-                )}',
+                '₦${_totalAmountFromApi.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
                 Colors.green,
               ),
 
@@ -593,6 +614,13 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
   }
 
   Widget _buildEmptyState() {
+    final hasMonthFilter = _selectedMonth != null;
+    final monthLabel = hasMonthFilter
+        ? _generateMonths().firstWhere(
+            (m) => m['value'] == _selectedMonth,
+          )['label']
+        : '';
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -606,7 +634,7 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'No Payment History',
+            hasMonthFilter ? 'No Payments Made' : 'No Payment History',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -614,15 +642,20 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Payment history will appear here once payments are recorded',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              hasMonthFilter
+                  ? 'No payments were made in $monthLabel'
+                  : 'Payment history will appear here once payments are recorded',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -861,13 +894,14 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
-      final paymentService = Provider.of<PaymentServices>(context, listen: false);
+      final paymentService = Provider.of<PaymentService>(
+        context,
+        listen: false,
+      );
       final paymentDetail = await paymentService.getPaymentById(paymentId);
 
       if (!mounted) return;
@@ -885,7 +919,9 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
             height: MediaQuery.of(context).size.height * 0.7,
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
             ),
             child: PaymentDetailSheet(paymentDetail: paymentDetail),
           );
@@ -906,7 +942,6 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
       );
     }
   }
-
 }
 
 // Helper class to combine payment and member data for history
@@ -916,13 +951,11 @@ class PaymentHistoryRecord {
 
   PaymentHistoryRecord({required this.payment, required this.member});
 }
+
 class PaymentDetailsSheetHistory extends StatelessWidget {
   final Payments payment;
 
-  const PaymentDetailsSheetHistory({
-    super.key,
-    required this.payment,
-  });
+  const PaymentDetailsSheetHistory({super.key, required this.payment});
 
   @override
   Widget build(BuildContext context) {
@@ -947,10 +980,9 @@ class PaymentDetailsSheetHistory extends StatelessWidget {
   Widget _header(BuildContext context) {
     return Text(
       'Payment Details',
-      style: Theme.of(context)
-          .textTheme
-          .titleLarge
-          ?.copyWith(fontWeight: FontWeight.bold),
+      style: Theme.of(
+        context,
+      ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
     );
   }
 
@@ -977,13 +1009,11 @@ class PaymentDetailsSheetHistory extends StatelessWidget {
     );
   }
 }
+
 class PaymentDetailsSheetFromHistory extends StatelessWidget {
   final Payment payment;
 
-  const PaymentDetailsSheetFromHistory({
-    super.key,
-    required this.payment,
-  });
+  const PaymentDetailsSheetFromHistory({super.key, required this.payment});
 
   @override
   Widget build(BuildContext context) {
@@ -994,10 +1024,9 @@ class PaymentDetailsSheetFromHistory extends StatelessWidget {
         children: [
           Text(
             'Payment Details',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           _row('Amount', '₦${payment.amount}'),
@@ -1036,10 +1065,7 @@ class PaymentDetailsSheetFromHistory extends StatelessWidget {
 class PaymentDetailSheet extends StatelessWidget {
   final PaymentDetail paymentDetail;
 
-  const PaymentDetailSheet({
-    super.key,
-    required this.paymentDetail,
-  });
+  const PaymentDetailSheet({super.key, required this.paymentDetail});
 
   @override
   Widget build(BuildContext context) {
@@ -1057,8 +1083,8 @@ class PaymentDetailSheet extends StatelessWidget {
               Text(
                 'Payment Details',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close),
@@ -1239,9 +1265,9 @@ class PaymentDetailSheet extends StatelessWidget {
   Widget _buildSectionTitle(BuildContext context, String title) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
     );
   }
 
@@ -1276,10 +1302,9 @@ class PaymentDetailSheet extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1301,4 +1326,7 @@ class PaymentDetailSheet extends StatelessWidget {
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
+
+
+  
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:special_squad/services/member_service.dart';
 import '../../models/membersDetails.dart';
-import '../../services/members.dart';
 
 class MemberDetailScreen extends StatefulWidget {
   final String memberId;
@@ -18,8 +18,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _memberFuture =
-        context.read<MemberServices>().getMemberById(widget.memberId);
+    _memberFuture = context.read<MemberService>().getMemberById(
+      widget.memberId,
+    );
   }
 
   @override
@@ -27,9 +28,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Member Details'),
-      ),
+      appBar: AppBar(title: const Text('Member Details')),
       body: FutureBuilder<MemberDetail>(
         future: _memberFuture,
         builder: (context, snapshot) {
@@ -62,23 +61,24 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         GestureDetector(
                           onTap: member.photo != null
                               ? () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => Dialog(
-                                backgroundColor: Colors.transparent,
-                                child: InteractiveViewer(
-                                  child: ClipRRect(
-                                    borderRadius:
-                                    BorderRadius.circular(12),
-                                    child: Image.network(
-                                      member.photo!,
-                                      fit: BoxFit.contain,
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => Dialog(
+                                      backgroundColor: Colors.transparent,
+                                      child: InteractiveViewer(
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          child: Image.network(
+                                            member.photo!,
+                                            fit: BoxFit.contain,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
+                                  );
+                                }
                               : null,
                           child: Container(
                             width: 280,
@@ -88,18 +88,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                               color: theme.colorScheme.primaryContainer,
                               image: member.photo != null
                                   ? DecorationImage(
-                                image:
-                                NetworkImage(member.photo!),
-                                fit: BoxFit.cover,
-                              )
+                                      image: NetworkImage(member.photo!),
+                                      fit: BoxFit.cover,
+                                    )
                                   : null,
                             ),
                             child: member.photo == null
                                 ? Icon(
-                              Icons.person,
-                              size: 64,
-                              color: theme.colorScheme.primary,
-                            )
+                                    Icons.person,
+                                    size: 64,
+                                    color: theme.colorScheme.primary,
+                                  )
                                 : null,
                           ),
                         ),
@@ -116,7 +115,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: member.isActive
                                 ? Colors.green.withOpacity(0.1)
@@ -150,7 +151,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     _buildInfoRow('ID Number', member.idNo),
                     _buildInfoRow(
                       'Date of Birth',
-                      '${member.dateOfBirth.day}/${member.dateOfBirth.month}/${member.dateOfBirth.year}',
+                      '${member.dateOfBirth.toLocal().day.toString().padLeft(2, '0')}/${member.dateOfBirth.toLocal().month.toString().padLeft(2, '0')}/${member.dateOfBirth.toLocal().year}',
                     ),
                     _buildInfoRow('Position', member.position),
                   ],
@@ -177,10 +178,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                 _buildSection(
                   title: 'System Information',
                   children: [
-                    _buildInfoRow(
-                      'Join Date',
-                      member.createdAt.toString(),
-                    ),
+                    _buildInfoRow('Join Date', member.createdAt.toString()),
                   ],
                 ),
               ],
@@ -200,9 +198,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   }) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -210,9 +206,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           children: [
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...children,
@@ -235,20 +231,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             flex: 3,
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
           ),
           Expanded(
             flex: 5,
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             ),
           ),
         ],

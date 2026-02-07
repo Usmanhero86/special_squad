@@ -40,9 +40,8 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
 
     try {
       // Load duty posts and members
-      final posts = await dutyService.getDutyPosts(
-        date: widget.selectedDate,
-      );      final members = await memberService.getMembersSync();
+      final posts = await dutyService.getDutyPosts(date: widget.selectedDate);
+      final members = await memberService.getMembersSync();
 
       // Create maps for quick lookup
       final postMap = <String, DutyPost>{};
@@ -238,7 +237,6 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
                 //     ),
                 //   ),
                 // ],
-
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 8),
@@ -289,12 +287,20 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
               size: 20,
             ),
             const SizedBox(width: 8),
-            Text(
-              'Member not found (ID: ${assignment.memberId})',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 14,
+            Expanded(
+              child: Text(
+                'Member not found (ID: ${assignment.memberId})',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 14,
+                ),
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20),
+              color: Theme.of(context).colorScheme.error,
+              onPressed: () => _showDeleteConfirmation(assignment, null),
+              tooltip: 'Delete Assignment',
             ),
           ],
         ),
@@ -422,6 +428,14 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
               ),
             ],
           ),
+
+          // Delete Button
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 20),
+            color: Colors.red,
+            onPressed: () => _showDeleteConfirmation(assignment, member),
+            tooltip: 'Delete Assignment',
+          ),
         ],
       ),
     );
@@ -454,6 +468,260 @@ class _DutyAssignmentViewScreenState extends State<DutyAssignmentViewScreen> {
         return Colors.blue;
       default:
         return Theme.of(context).colorScheme.primary;
+    }
+  }
+
+  void _showDeleteConfirmation(DutyRoster assignment, Member? member) {
+    final dutyPost = _dutyPosts[assignment.dutyPostId];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Duty Assignment'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Are you sure you want to delete this duty assignment?'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (dutyPost != null) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.work, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            dutyPost.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (member != null) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.person, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            member.fullName,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'ID: ${member.rifleNumber}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getShiftColor(
+                            assignment.shift,
+                          ).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          assignment.shift,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _getShiftColor(assignment.shift),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(
+                            assignment.status,
+                          ).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          assignment.status,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _getStatusColor(assignment.status),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmDeleteAssignment(assignment);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteAssignment(DutyRoster assignment) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Deleting assignment...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      final dutyService = Provider.of<DutyService>(context, listen: false);
+      await dutyService.deleteDutyAssignment(assignment.id);
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Duty assignment has been deleted successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // Refresh the data
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Parse error message
+        String errorMessage = e.toString();
+        if (errorMessage.contains('Exception:')) {
+          errorMessage = errorMessage.replaceFirst('Exception:', '').trim();
+        }
+
+        // Check if it's an endpoint not found error
+        final isEndpointError =
+            errorMessage.toLowerCase().contains('endpoint') ||
+            errorMessage.toLowerCase().contains('not found') ||
+            errorMessage.toLowerCase().contains('not implemented');
+
+        // Show error dialog with more details
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    isEndpointError ? Icons.warning : Icons.error,
+                    color: isEndpointError ? Colors.orange : Colors.red,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Cannot Delete')),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(errorMessage),
+                  if (isEndpointError) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.blue.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Note:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'The delete duty assignment API endpoint may not be responding correctly. The endpoint should be:\n\n'
+                            'DELETE /api/v1/admin/duty/assign/{assignmentId}\n\n'
+                            'Please verify with the backend team.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
     }
   }
 }

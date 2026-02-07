@@ -1,13 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:special_squad/screens/members/sections/section_title.dart';
 import '../../models/location_location.dart';
 import '../../services/location_provider.dart';
 import 'guarantor_infoo.dart';
-import 'package:path/path.dart' as path;
 
 class AddMemberScreen extends StatefulWidget {
   const AddMemberScreen({super.key});
@@ -30,6 +28,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
   final TextEditingController maritalController = TextEditingController();
   final TextEditingController positionController = TextEditingController();
   final TextEditingController ninController = TextEditingController();
+  final TextEditingController bvnController = TextEditingController();
   final TextEditingController stateController = TextEditingController();
   final TextEditingController accountController = TextEditingController();
   final TextEditingController unitAreaController = TextEditingController();
@@ -39,7 +38,6 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
   String? selectedUnitAreaType;
 
   Location? _selectedLocation;
-  bool _isLoadingLocations = true;
   // Profile image
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
@@ -72,11 +70,12 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
             _buildProfilePictureSection(),
             const SizedBox(height: 24),
 
-          Align(
-            alignment: Alignment.center,
-            child: SectionTitle(title: 'Membership Data Form')),
+            Align(
+              alignment: Alignment.center,
+              child: SectionTitle(title: 'Membership Data Form'),
+            ),
             const SizedBox(height: 24),
-            SectionTitle(title: 'Contact Info',),
+            SectionTitle(title: 'Contact Info'),
 
             // Form Fields
             _buildFormSection(),
@@ -155,7 +154,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
             }
 
             return DropdownButtonFormField<Location>(
-              value: _selectedLocation,
+              initialValue: _selectedLocation,
               hint: const Text('Select location'),
               items: provider.locations.map((location) {
                 return DropdownMenuItem<Location>(
@@ -233,6 +232,8 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
             _buildCheckboxOption('Neighbourhood Watch'),
             _buildCheckboxOption('Hybrid Force'),
             _buildCheckboxOption('Volunteer'),
+            _buildCheckboxOption('Hunter'),
+            _buildCheckboxOption('SF'),
           ],
         ),
       ],
@@ -400,11 +401,12 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildLabel('State'),
+                  _buildLabel('BVN'),
                   const SizedBox(height: 4),
                   TextFormField(
-                    controller: stateController,
-                    decoration: _inputDecoration('Enter state'),
+                    controller: bvnController,
+                    decoration: _inputDecoration('Enter BVN number'),
+                    keyboardType: TextInputType.number,
                   ),
                 ],
               ),
@@ -414,6 +416,20 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('State'),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    controller: stateController,
+                    decoration: _inputDecoration('Enter state'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,7 +444,11 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,11 +548,11 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     if (picked != null) {
       setState(() {
         selectedDob = picked;
-        dobController.text =
-        "${picked.day}/${picked.month}/${picked.year}";
+        dobController.text = "${picked.day}/${picked.month}/${picked.year}";
       });
     }
   }
+
   // Profile Picture Section
   Widget _buildProfilePictureSection() {
     return Center(
@@ -568,7 +588,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                           size: 40,
                           color: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.6),
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -576,7 +596,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                           style: TextStyle(
                             color: Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.6),
+                            ).colorScheme.onSurface.withValues(alpha: 0.6),
                             fontSize: 12,
                           ),
                         ),
@@ -588,7 +608,9 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
           Text(
             'Tap to add profile picture',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),
@@ -613,12 +635,14 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error picking image: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -660,13 +684,13 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       "maritalStatus": maritalController.text.trim(),
       "position": positionController.text.trim(),
       "ninNo": ninController.text.trim(),
+      "bvn": bvnController.text.trim(),
       "state": stateController.text.trim(),
       "accountNo": accountController.text.trim(),
       "unitArea": unitAreaController.text.trim(),
       "unitAreaType": selectedUnitAreaType,
-
     };
-    print('✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅$memberData');
+    debugPrint('Member data: $memberData');
     Navigator.push(
       context,
       MaterialPageRoute(

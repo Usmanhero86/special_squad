@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:special_squad/services/member_service.dart';
 import '../../models/getAllMember.dart';
 import '../../models/member_overview.dart';
-import '../../services/member_service.dart';
-import '../../services/members.dart';
+import '../../models/member.dart';
+import '../../services/location_provider.dart';
 import 'add_member_screen.dart';
 import 'member_detail_screen.dart';
+import 'edit_member_screen.dart';
 
 class MemberListScreen extends StatefulWidget {
   const MemberListScreen({super.key});
@@ -25,13 +27,12 @@ class _MemberListScreenState extends State<MemberListScreen> {
     return photo != null &&
         photo.isNotEmpty &&
         photo.startsWith('http') &&
-        !photo.contains('example.com'); // 🚫 block fake URLs
+        !photo.contains('example.com');
   }
 
-  int _page = 1;
+  final int _page = 1;
   final int _limit = 10;
   MemberOverview? _overview;
-  bool _isOverviewLoading = true;
 
   @override
   void initState() {
@@ -56,7 +57,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
 
   Future<void> _loadOverview() async {
     try {
-      final memberService = context.read<MemberServices>();
+      final memberService = context.read<MemberService>();
       final overview = await memberService.getMemberOverview();
 
       if (!mounted) return;
@@ -73,7 +74,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
 
   Future<void> _loadMembers() async {
     try {
-      final memberService = context.read<MemberServices>();
+      final memberService = context.read<MemberService>();
       final members = await memberService.getMembers(
         page: _page,
         limit: _limit,
@@ -121,9 +122,264 @@ class _MemberListScreenState extends State<MemberListScreen> {
     });
   }
 
-  // int get _totalMembers => _allMembers.length;
-  // int get _activeMembers => _allMembers.where((m) => m.isActive).length;
-  // int get _inactiveMembers => _totalMembers - _activeMembers;
+  void _viewMember(Members member) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MemberDetailScreen(memberId: member.id),
+      ),
+    );
+  }
+
+  void _editMember(Members member) async {
+    try {
+      // Show loading indicator while fetching full member details
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Loading member details...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      // Fetch full member details from API
+      final memberService = context.read<MemberService>();
+      final memberDetail = await memberService.getMemberById(member.id);
+
+      // Ensure locations are loaded for conversion
+      final locationProvider = context.read<LocationProvider>();
+      if (locationProvider.locations.isEmpty) {
+        debugPrint('🔄 Loading locations for conversion...');
+        await locationProvider.loadLocations();
+        debugPrint('✅ Loaded ${locationProvider.locations.length} locations');
+      }
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(); // Close loading dialog
+
+      // The API returns location name but expects location UUID
+      // We need to convert the location name to UUID
+      String locationId = memberDetail.location;
+
+      debugPrint('🔍 Original location value: "$locationId"');
+      debugPrint(
+        '🔍 Available locations: ${locationProvider.locations.map((l) => '${l.name} (${l.id})').join(", ")}',
+      );
+
+      // If location looks like a name (not a UUID), try to find the UUID
+      if (locationId.isNotEmpty && !locationId.contains('-')) {
+        // It's a location name, need to find the UUID
+        try {
+          final matchingLocation = locationProvider.locations.firstWhere(
+            (loc) => loc.name.toLowerCase() == locationId.toLowerCase(),
+          );
+          locationId = matchingLocation.id;
+          debugPrint(
+            '✅ Converted location name "${memberDetail.location}" to UUID: $locationId',
+          );
+        } catch (e) {
+          debugPrint('⚠️ Could not find location UUID for: "$locationId"');
+          // Keep the original value if not found
+          locationId = '';
+        }
+      }
+
+      // Parse additional info from memberDetail
+      final additionalInfo = <String, dynamic>{
+        'tribe': memberDetail.tribe,
+        'religion': memberDetail.religion,
+        'gender': memberDetail.gender,
+        'maritalStatus': memberDetail.maritalStatus,
+        'ninNo': memberDetail.ninNo,
+        'bvnNo': memberDetail.bvnNo,
+        'state': memberDetail.state,
+        'accountNo': memberDetail.accountNo,
+        'unitArea': memberDetail.unitArea,
+        'unitAreaType': memberDetail.unitAreaType,
+        'guarantorFullName': memberDetail.guarantorFullName,
+        'guarantorRelationship': memberDetail.guarantorRelationship,
+        'guarantorTribe': memberDetail.guarantorTribe,
+        'guarantorPhoneNumber': memberDetail.guarantorPhoneNumber,
+        'emergencyFullName': memberDetail.emergencyFullName,
+        'emergencyAddress': memberDetail.emergencyAddress,
+        'emergencyPhoneNumber': memberDetail.emergencyPhoneNumber,
+        'nextOfKinFullName': memberDetail.nextOfKinFullName,
+        'nextOfKinAddress': memberDetail.nextOfKinAddress,
+        'nextOfKinPhoneNumber': memberDetail.nextOfKinPhoneNumber,
+      };
+
+      // Convert MemberDetail to Member for EditMemberScreen
+      final memberForEdit = Member(
+        id: member.id,
+        fullName: memberDetail.fullName,
+        rifleNumber: memberDetail.rifleNo,
+        phone: memberDetail.phoneNumber,
+        dateOfBirth: memberDetail.dateOfBirth,
+        address: memberDetail.permanentAddress,
+        position: memberDetail.position,
+        joinDate: memberDetail.createdAt,
+        profileImage: memberDetail.photo,
+        isActive: member.isActive,
+        location: locationId, // ✅ Pass the location UUID here
+        additionalInfo: additionalInfo, // ✅ Pass all additional info
+      );
+
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EditMemberScreen(member: memberForEdit),
+        ),
+      );
+
+      if (result == true) {
+        _loadMembers(); // Refresh the list
+        _loadOverview(); // Refresh overview stats
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading member details: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDeleteConfirmation(Members member) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Member'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Are you sure you want to delete this member?'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      member.fullName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('ID: ${member.rifleNo}'),
+                    Text('Position: ${member.position}'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'This action cannot be undone.',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteMember(member);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteMember(Members member) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Deleting member...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      final memberService = context.read<MemberService>();
+      await memberService.deleteMember(member.id);
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${member.fullName} has been deleted successfully'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Refresh the list and overview
+        _loadMembers();
+        _loadOverview();
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting member: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -472,16 +728,28 @@ class _MemberListScreenState extends State<MemberListScreen> {
       itemBuilder: (context, index) {
         final member = _filteredMembers[index];
         return Container(
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
-              vertical: 1,
+              vertical: 8,
             ),
             leading: CircleAvatar(
               radius: 24,
               backgroundColor: Theme.of(
                 context,
-              ).colorScheme.primary.withOpacity(0.1),
+              ).colorScheme.primary.withValues(alpha: 0.1),
               child: hasValidPhoto(member.photo)
                   ? ClipOval(
                       child: Image.network(
@@ -510,16 +778,14 @@ class _MemberListScreenState extends State<MemberListScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ID: ${member.rifleNo}',
+                  'Rifle: ${member.rifleNo}',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 Text(
-                  member.position,
+                  'Location: ${member.location}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.primary,
@@ -528,20 +794,60 @@ class _MemberListScreenState extends State<MemberListScreen> {
                 ),
               ],
             ),
-            trailing: Icon(
-              Icons.chevron_right,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MemberDetailScreen(memberId: member.id),
+            trailing: PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_vert,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+              onSelected: (value) {
+                switch (value) {
+                  case 'view':
+                    _viewMember(member);
+                    break;
+                  case 'edit':
+                    _editMember(member);
+                    break;
+                  case 'delete':
+                    _showDeleteConfirmation(member);
+                    break;
+                }
+              },
+              itemBuilder: (BuildContext context) => [
+                const PopupMenuItem<String>(
+                  value: 'view',
+                  child: Row(
+                    children: [
+                      Icon(Icons.visibility, size: 20),
+                      SizedBox(width: 12),
+                      Text('View Details'),
+                    ],
+                  ),
                 ),
-              );
-            },
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 20, color: Colors.blue),
+                      SizedBox(width: 12),
+                      Text('Edit Member'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 20, color: Colors.red),
+                      SizedBox(width: 12),
+                      Text('Delete Member'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            onTap: () => _viewMember(member),
           ),
         );
       },

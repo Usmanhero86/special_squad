@@ -156,8 +156,10 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
                 return;
               }
 
-              final dutyService =
-                  Provider.of<DutyService>(context, listen: false);
+              final dutyService = Provider.of<DutyService>(
+                context,
+                listen: false,
+              );
 
               try {
                 debugPrint('🟡 ADD DUTY POST STARTED');
@@ -237,10 +239,9 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                color: Theme.of(context)
-                    .colorScheme
-                    .primaryContainer
-                    .withValues(alpha: 0.3),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primaryContainer.withValues(alpha: 0.3),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -294,11 +295,13 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
                     final date = _selectedDate.subtract(
                       Duration(days: _selectedDate.weekday - 1 - index),
                     );
-                    final isSelected = date.day == _selectedDate.day &&
+                    final isSelected =
+                        date.day == _selectedDate.day &&
                         date.month == _selectedDate.month &&
                         date.year == _selectedDate.year;
                     final dateKey = DateTime(date.year, date.month, date.day);
-                    final hasEvents = _events.containsKey(dateKey) &&
+                    final hasEvents =
+                        _events.containsKey(dateKey) &&
                         _events[dateKey]!.isNotEmpty;
 
                     return GestureDetector(
@@ -314,13 +317,12 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
                           color: isSelected
                               ? Theme.of(context).colorScheme.primary
                               : hasEvents
-                                  ? Theme.of(context)
-                                      .colorScheme
-                                      .secondary
-                                      .withValues(alpha: 0.3)
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest,
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.secondary.withValues(alpha: 0.3)
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Column(
@@ -433,7 +435,9 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
 
   void editDutyPost(DutyPost post) {
     final nameController = TextEditingController(text: post.name);
-    final descriptionController = TextEditingController(text: post.description ?? '');
+    final descriptionController = TextEditingController(
+      text: post.description ?? '',
+    );
 
     showDialog(
       context: context,
@@ -445,13 +449,17 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Post Name *'),
+                decoration: const InputDecoration(
+                  labelText: 'Post Name *',
+                  hintText: 'Enter post name',
+                ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: descriptionController,
                 decoration: const InputDecoration(
                   labelText: 'Description (optional)',
+                  hintText: 'Enter description',
                 ),
                 maxLines: 3,
               ),
@@ -465,14 +473,19 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Implement update functionality when API is available
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Post name is required'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Update functionality coming soon'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
+              _updateDutyPost(post, name, descriptionController.text.trim());
             },
             child: const Text('Update'),
           ),
@@ -481,12 +494,160 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     );
   }
 
+  Future<void> _updateDutyPost(
+    DutyPost post,
+    String name,
+    String description,
+  ) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Updating duty post...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      final dutyService = Provider.of<DutyService>(context, listen: false);
+      final updatedPost = await dutyService.updateDutyPost(
+        dutyPostId: post.id,
+        postName: name,
+        description: description.isEmpty ? null : description,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Update the post in the list
+        setState(() {
+          final index = _dutyPosts.indexWhere((p) => p.id == post.id);
+          if (index != -1) {
+            _dutyPosts[index] = updatedPost;
+          }
+        });
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Duty post "$name" has been updated successfully'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating duty post: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
   void deleteDutyPost(DutyPost post) {
+    // Check if there are assignments
+    final hasAssignments =
+        post.dutyAssignments != null && post.dutyAssignments!.isNotEmpty;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Duty Post'),
-        content: Text('Are you sure you want to delete "${post.name}"?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasAssignments) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning, color: Colors.orange, size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'This duty post has ${post.dutyAssignments!.length} active assignment(s)',
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            const Text('Are you sure you want to delete this duty post?'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    post.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  if (post.description != null &&
+                      post.description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text('Description: ${post.description}'),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (hasAssignments)
+              const Text(
+                'Note: You may need to remove all duty assignments first before deleting this post.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey,
+                ),
+              )
+            else
+              const Text(
+                'This action cannot be undone.',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -494,16 +655,13 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              // TODO: Implement delete functionality when API is available
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Delete functionality coming soon'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
+              _confirmDeleteDutyPost(post);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -511,12 +669,132 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     );
   }
 
+  Future<void> _confirmDeleteDutyPost(DutyPost post) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Deleting duty post...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      final dutyService = Provider.of<DutyService>(context, listen: false);
+      await dutyService.deleteDutyPost(post.id);
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Duty post "${post.name}" has been deleted successfully',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Refresh the list
+        setState(() {
+          _dutyPosts.removeWhere((p) => p.id == post.id);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Parse error message
+        String errorMessage = e.toString();
+        if (errorMessage.contains('Exception:')) {
+          errorMessage = errorMessage.replaceFirst('Exception:', '').trim();
+        }
+
+        // Check if it's an assignment-related error
+        final isAssignmentError = errorMessage.toLowerCase().contains(
+          'assignment',
+        );
+
+        // Show error dialog with more details
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    isAssignmentError ? Icons.warning : Icons.error,
+                    color: isAssignmentError ? Colors.orange : Colors.red,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Cannot Delete')),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(errorMessage),
+                  if (isAssignmentError) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.blue.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'What to do:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            '1. Remove all duty assignments from this post first\n'
+                            '2. Then try deleting the duty post again',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
+  }
+
   void showDutyPostDetails(DutyPost post) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => DutyPostDetailsSheet(post: post),
-      ),
+      MaterialPageRoute(builder: (_) => DutyPostDetailsSheet(post: post)),
     );
   }
 }
@@ -570,13 +848,14 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(  appBar: AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => Navigator.pop(context),
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Duty Post Details'),
       ),
-      title: const Text('Duty Post Details'),
-    ),
       body: Container(
         height: MediaQuery.of(context).size.height * 1,
         decoration: BoxDecoration(
@@ -598,7 +877,9 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -614,15 +895,15 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                             children: [
                               Text(
                                 widget.post.name,
-                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 'Duty Post',
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.6),
                                   fontSize: 14,
                                 ),
                               ),
@@ -632,21 +913,23 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                       ],
                     ),
                     const SizedBox(height: 24),
-      
+
                     // Description
-                    if (widget.post.description != null && widget.post.description!.isNotEmpty) ...[
+                    if (widget.post.description != null &&
+                        widget.post.description!.isNotEmpty) ...[
                       Text(
                         'Description',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -663,15 +946,19 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                       children: [
                         Text(
                           'Assigned Members',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         if (!_isLoading)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -686,7 +973,7 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                       ],
                     ),
                     const SizedBox(height: 12),
-      
+
                     // Assigned Members List
                     if (_isLoading)
                       const Center(
@@ -700,7 +987,9 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(32),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -708,13 +997,17 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                             Icon(
                               Icons.people_outline,
                               size: 48,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.4),
                             ),
                             const SizedBox(height: 12),
                             Text(
                               'No members assigned yet',
                               style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.6),
                                 fontSize: 14,
                               ),
                             ),
@@ -722,10 +1015,12 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                         ),
                       )
                     else
-                      ..._assignedMembers.map((assignment) => _buildMemberCard(context, assignment)),
-      
+                      ..._assignedMembers.map(
+                        (assignment) => _buildMemberCard(context, assignment),
+                      ),
+
                     const SizedBox(height: 12),
-      
+
                     // Action Button
                     SizedBox(
                       width: double.infinity,
@@ -735,9 +1030,8 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => AssignDutyScreen(
-                                dutyPostId: widget.post.id,
-                              ),
+                              builder: (context) =>
+                                  AssignDutyScreen(dutyPostId: widget.post.id),
                             ),
                           );
                         },
@@ -784,7 +1078,9 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
           CircleAvatar(
             radius: 28,
             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            backgroundImage: member.hasPhoto ? NetworkImage(member.displayPhoto) : null,
+            backgroundImage: member.hasPhoto
+                ? NetworkImage(member.displayPhoto)
+                : null,
             child: !member.hasPhoto
                 ? Text(
                     member.fullName.substring(0, 1).toUpperCase(),
@@ -815,7 +1111,9 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                     'Rifle No: ${member.rifleNo}',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                 const SizedBox(height: 4),
@@ -840,27 +1138,47 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
               ],
             ),
           ),
-          // Status Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: member.status == 'ACTIVE'
-                  ? Colors.green.withValues(alpha: 0.1)
-                  : Colors.grey.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: member.status == 'ACTIVE' ? Colors.green : Colors.grey,
-                width: 1,
+          // Status Badge and Delete Button
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: member.status == 'ACTIVE'
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: member.status == 'ACTIVE'
+                        ? Colors.green
+                        : Colors.grey,
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  member.status,
+                  style: TextStyle(
+                    color: member.status == 'ACTIVE'
+                        ? Colors.green
+                        : Colors.grey,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              member.status,
-              style: TextStyle(
-                color: member.status == 'ACTIVE' ? Colors.green : Colors.grey,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 8),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                color: Colors.red,
+                onPressed: () => _showDeleteAssignmentConfirmation(assignment),
+                tooltip: 'Delete Assignment',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -896,7 +1214,9 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 4),
@@ -912,5 +1232,220 @@ class _DutyPostDetailsSheetState extends State<DutyPostDetailsSheet> {
         ),
       ],
     );
+  }
+
+  void _showDeleteAssignmentConfirmation(DutyAssignment assignment) {
+    final member = assignment.member;
+    final assignmentDate = DateTime.tryParse(assignment.day);
+    final formattedDate = assignmentDate != null
+        ? '${assignmentDate.day}/${assignmentDate.month}/${assignmentDate.year}'
+        : assignment.day;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Duty Assignment'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Are you sure you want to delete this duty assignment?'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.work, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.post.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.person, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          member.fullName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (member.rifleNo != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Rifle No: ${member.rifleNo}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                  const SizedBox(height: 4),
+                  Text(
+                    'Date: $formattedDate',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmDeleteAssignment(assignment);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteAssignment(DutyAssignment assignment) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Deleting assignment...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      final dutyService = Provider.of<DutyService>(context, listen: false);
+      await dutyService.deleteDutyAssignment(assignment.id);
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Duty assignment has been deleted successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // Refresh the assigned members list
+        _loadAssignedMembers();
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+
+        // Parse error message
+        String errorMessage = e.toString();
+        if (errorMessage.contains('Exception:')) {
+          errorMessage = errorMessage.replaceFirst('Exception:', '').trim();
+        }
+
+        // Check if it's an endpoint not found error
+        final isEndpointError =
+            errorMessage.toLowerCase().contains('endpoint') ||
+            errorMessage.toLowerCase().contains('not found') ||
+            errorMessage.toLowerCase().contains('not implemented');
+
+        // Show error dialog with more details
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    isEndpointError ? Icons.warning : Icons.error,
+                    color: isEndpointError ? Colors.orange : Colors.red,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Cannot Delete')),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(errorMessage),
+                  if (isEndpointError) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.blue.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Note:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'The delete duty assignment API endpoint may not be responding correctly. The endpoint should be:\n\n'
+                            'DELETE /api/v1/admin/duty/assign/{assignmentId}\n\n'
+                            'Please verify with the backend team.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
   }
 }

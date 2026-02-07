@@ -5,7 +5,6 @@ import '../../models/member.dart';
 import '../../models/payment_detail.dart';
 import '../../models/payment_member.dart';
 import '../../services/payment_service.dart';
-import '../../services/payment.dart';
 import 'add_payment_screen.dart';
 import 'payment_details_sheet.dart';
 import 'payment_history_screen.dart';
@@ -18,7 +17,7 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  List<PaymentRecord> _paymentRecords = [];
+  final List<PaymentRecord> _paymentRecords = [];
   List<PaymentRecord> _filteredRecords = [];
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
@@ -30,19 +29,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _hasMore = true;
   final ScrollController _scrollController = ScrollController();
 
-
   Future<void> _showPaymentDetailsById(String paymentId) async {
     // Show loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
-      final paymentService = Provider.of<PaymentServices>(context, listen: false);
+      final paymentService = Provider.of<PaymentService>(
+        context,
+        listen: false,
+      );
       final paymentDetail = await paymentService.getPaymentById(paymentId);
 
       if (!mounted) return;
@@ -60,7 +59,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
             height: MediaQuery.of(context).size.height * 0.7,
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
             ),
             child: PaymentDetailSheet(paymentDetail: paymentDetail),
           );
@@ -90,8 +91,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     for (int i = 0; i < 12; i++) {
       final date = DateTime(now.year, now.month - i, 1);
       final monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
 
       months.add({
@@ -109,8 +120,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     final now = DateTime.now();
     const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
 
     _selectedMonth = '${monthNames[now.month - 1]},${now.year}'; // ✅ FIXED
@@ -125,6 +146,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _searchController.dispose();
     super.dispose();
   }
+
   // ---------------- SCROLL ----------------
   void _onScroll() {
     if (_scrollController.position.pixels >=
@@ -137,8 +159,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Future<void> _loadPaymentRecords({bool loadMore = false}) async {
     if (_isLoadingMore || (!_hasMore && loadMore)) return;
 
-    final paymentService =
-    Provider.of<PaymentService>(context, listen: false);
+    final paymentService = Provider.of<PaymentService>(context, listen: false);
 
     if (loadMore) {
       _isLoadingMore = true;
@@ -224,7 +245,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
         status: m.isPaid ? 'Paid' : 'Unpaid',
       );
     }).toList();
-  }  // ---------------- SEARCH ----------------
+  } // ---------------- SEARCH ----------------
+
   void _filterRecords() {
     final query = _searchController.text.toLowerCase();
     setState(() {
@@ -380,18 +402,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 : _filteredRecords.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
-              controller: _scrollController,
-              itemCount: _filteredRecords.length + (_hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _filteredRecords.length) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                return _buildPaymentRecordTile(_filteredRecords[index]);
-              },
-            )
+                    controller: _scrollController,
+                    itemCount: _filteredRecords.length + (_hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _filteredRecords.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      return _buildPaymentRecordTile(_filteredRecords[index]);
+                    },
+                  ),
           ),
         ],
       ),
@@ -424,7 +446,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
             'Payment records will appear here once members are added',
             style: TextStyle(
               fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
           ),
@@ -436,7 +460,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Widget _buildPaymentRecordTile(PaymentRecord record) {
     final isPaid =
         record.status.toLowerCase() == 'paid' ||
-            record.status.toLowerCase() == 'completed';
+        record.status.toLowerCase() == 'completed';
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
@@ -470,11 +494,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       : Colors.transparent,
                 ),
                 child: isPaid
-                    ? Icon(
-                        Icons.check,
-                        size: 16,
-                        color: Colors.white,
-                      )
+                    ? Icon(Icons.check, size: 16, color: Colors.white)
                     : null,
               ),
             ),
@@ -708,9 +728,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Payment status updated to $newStatus',
-            ),
+            content: Text('Payment status updated to $newStatus'),
             backgroundColor: newStatus == 'Paid' || newStatus == 'Completed'
                 ? Colors.green
                 : Colors.orange,
@@ -738,7 +756,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _showPaymentDetails(PaymentRecord record) {
     // If payment exists and has an ID, fetch detailed information
-    if (record.payment != null && record.payment!.id.isNotEmpty && record.payment!.id != 'temp') {
+    if (record.payment != null &&
+        record.payment!.id.isNotEmpty &&
+        record.payment!.id != 'temp') {
       _showPaymentDetailsById(record.payment!.id);
     } else {
       // Show basic payment details for unpaid records
@@ -924,10 +944,7 @@ class PaymentRecord {
 class PaymentDetailSheet extends StatelessWidget {
   final PaymentDetail paymentDetail;
 
-  const PaymentDetailSheet({
-    super.key,
-    required this.paymentDetail,
-  });
+  const PaymentDetailSheet({super.key, required this.paymentDetail});
 
   @override
   Widget build(BuildContext context) {
@@ -945,8 +962,8 @@ class PaymentDetailSheet extends StatelessWidget {
               Text(
                 'Payment Details',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close),
@@ -1127,9 +1144,9 @@ class PaymentDetailSheet extends StatelessWidget {
   Widget _buildSectionTitle(BuildContext context, String title) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
     );
   }
 
@@ -1164,10 +1181,9 @@ class PaymentDetailSheet extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 4),

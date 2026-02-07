@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:special_squad/screens/payments/add_payment_screen.dart';
 import 'package:special_squad/screens/payments/payments_screen.dart';
 import './members/add_member_screen.dart';
 import './members/member_list_screen.dart';
 import './duty/duty_post_screen.dart';
 import 'location/location.dart';
-import './payments/payment_history_screen.dart';
-import './profile/profile_screen.dart';
 import '../widgets/dashboard_card.dart';
 import '../widgets/theme_toggle_button.dart';
 import 'duty/assign_duty_screen.dart';
