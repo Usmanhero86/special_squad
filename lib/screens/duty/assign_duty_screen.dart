@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/getAllMember.dart';
 import '../../models/member.dart';
 import '../../models/duty_post.dart';
-import '../../models/duty_roster.dart';
-
-import '../../services/member_service.dart';
 import '../../services/duty_service.dart';
-import '../../services/members.dart';
+import '../../services/member_service.dart';
 
 class AssignDutyScreen extends StatefulWidget {
   final String? dutyPostId;
@@ -31,7 +27,6 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
   String? _selectedPostId;
 
   List<Member> _hqMembers = [];
-  List<DutyPost> _posts = [];
 
   final TextEditingController _notesController = TextEditingController();
   bool _isLoading = true;
@@ -55,7 +50,7 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
   // LOAD MEMBERS AND POSTS (MAIN FIX)
   // ===============================
   Future<void> _loadData() async {
-    final memberService = Provider.of<MemberServices>(context, listen: false);
+    final memberService = Provider.of<MemberService>(context, listen: false);
     final dutyService = Provider.of<DutyService>(context, listen: false);
 
     try {
@@ -86,21 +81,20 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
         _hqMembers = hqMembers
             .map(
               (m) => Member(
-            id: m.id,
-            fullName: m.fullName,
-            rifleNumber: m.rifleNo,
-            phone: '',
-            dateOfBirth: DateTime.now(),
-            address: '',
-            position: m.position,
-            joinDate: DateTime.now(),
-            isActive: m.isActive,
-            location: m.location,
-          ),
-        )
+                id: m.id,
+                fullName: m.fullName,
+                rifleNumber: m.rifleNo,
+                phone: '',
+                dateOfBirth: DateTime.now(),
+                address: '',
+                position: m.position,
+                joinDate: DateTime.now(),
+                isActive: m.isActive,
+                location: m.location,
+              ),
+            )
             .toList();
 
-        _posts = posts; // ✅ FIXED TYPE
         _isLoading = false;
       });
     } catch (e, s) {
@@ -120,79 +114,6 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
   }
 
   // ===============================
-  // ADD DUTY POST
-  // ===============================
-  void _showAddDutyPostDialog() {
-    final controller = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Duty Post'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Enter post name',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isEmpty) return;
-
-              Navigator.pop(context);
-
-              final dutyService = Provider.of<DutyService>(context, listen: false);
-
-              try {
-                debugPrint('🟡 ADD DUTY POST STARTED');
-                debugPrint('📤 POST NAME: $name');
-
-                final post = await dutyService.addDutyPost(name);
-
-                debugPrint('✅ DUTY POST CREATED: ${post.id}');
-
-                setState(() {
-                  _posts.add(post);
-                  _selectedPostId = post.id;
-                });
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Duty post "$name" created successfully!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-
-              } catch (e, s) {
-                debugPrint('❌ ADD DUTY POST ERROR: $e');
-                debugPrint(s.toString());
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to create duty post: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===============================
   // UI
   // ===============================
   @override
@@ -203,7 +124,6 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
         title: const Text('Assign Duty'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -263,10 +183,10 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
           items: _hqMembers
               .map(
                 (member) => DropdownMenuItem(
-              value: member.id,
-              child: Text(member.fullName),
-            ),
-          )
+                  value: member.id,
+                  child: Text(member.fullName),
+                ),
+              )
               .toList(),
           onChanged: (value) {
             if (value != null && !_selectedMemberIds.contains(value)) {
@@ -274,37 +194,6 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
                 _selectedMemberIds.add(value);
               });
             }
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDutyPostSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Select Duty Post',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          value: _selectedPostId,
-          isExpanded: true,
-          hint: const Text('Select duty post'),
-          items: _posts
-              .map(
-                (post) => DropdownMenuItem(
-              value: post.id,
-              child: Text(post.name),
-            ),
-          )
-              .toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedPostId = value;
-            });
           },
         ),
       ],
@@ -365,15 +254,12 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          value: _selectedShift,
+          initialValue: _selectedShift,
           isExpanded: true,
           items: _shifts
               .map(
-                (shift) => DropdownMenuItem(
-              value: shift,
-              child: Text(shift),
-            ),
-          )
+                (shift) => DropdownMenuItem(value: shift, child: Text(shift)),
+              )
               .toList(),
           onChanged: (value) {
             if (value != null) {

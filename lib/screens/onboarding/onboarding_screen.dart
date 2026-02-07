@@ -90,7 +90,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
                                 child: Image.asset(
-                                  'lib/assets/Screenshot 2026-01-30 142441.png',
+                                  'assets/Screenshot 2026-01-30 142441.png',
                                   width: 120,
                                   height: 140,
                                   fit: BoxFit.contain,
@@ -169,99 +169,102 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     builder: (context, child) {
                       return FadeTransition(
                         opacity: _fadeAnimation,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Page indicators
-                            Row(
-                              children: [
-                                _buildPageIndicator(true),
-                                const SizedBox(width: 8),
-                                _buildPageIndicator(false),
-                                const SizedBox(width: 8),
-                                _buildPageIndicator(false),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Page indicators
+                              Row(
+                                children: [
+                                  _buildPageIndicator(true),
+                                  const SizedBox(width: 8),
+                                  _buildPageIndicator(false),
+                                  const SizedBox(width: 8),
+                                  _buildPageIndicator(false),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
 
-                            // Title
-                            const Text(
-                              'SPECIAL SQUAD',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2C3E50),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-
-                            // Subtitle
-                            const Text(
-                              'Special Force Joint Task Force',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Color(0xFF7F8C8D),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-
-                            // Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2C3E50),
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: const Text(
-                                'BORNO STATE YOUTH VANGUARD',
+                              // Title
+                              const Text(
+                                'SPECIAL SQUAD',
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white,
+                                  fontSize: 28,
                                   fontWeight: FontWeight.bold,
-                                  letterSpacing: 1,
+                                  color: Color(0xFF2C3E50),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
+                              const SizedBox(height: 8),
 
-                            // Description
-                            const Text(
-                              'SECTOR 11 HEADQUARTERS MAIDUGURI\nBORNO STATE',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF7F8C8D),
-                                height: 1.5,
+                              // Subtitle
+                              const Text(
+                                'Special Force Joint Task Force',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xFF7F8C8D),
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 12),
 
-                            // Next Button
-                            SizedBox(
-                              width: double.infinity,
-                              height: 55,
-                              child: ElevatedButton(
-                                onPressed: _navigateToLogin,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFD4AF37),
-                                  foregroundColor: Colors.white,
-                                  elevation: 3,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
+                              // Badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2C3E50),
+                                  borderRadius: BorderRadius.circular(15),
                                 ),
                                 child: const Text(
-                                  'Next',
+                                  'BORNO STATE YOUTH VANGUARD',
                                   style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 12),
+
+                              // Description
+                              const Text(
+                                'SECTOR 11 HEADQUARTERS MAIDUGURI\nBORNO STATE',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF7F8C8D),
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Next Button
+                              SizedBox(
+                                width: double.infinity,
+                                height: 55,
+                                child: ElevatedButton(
+                                  onPressed: _navigateToLogin,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD4AF37),
+                                    foregroundColor: Colors.white,
+                                    elevation: 3,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Next',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },

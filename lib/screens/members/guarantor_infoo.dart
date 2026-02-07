@@ -1,18 +1,18 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:special_squad/screens/members/sections/section_title.dart';
-import '../../models/member.dart';
-import '../../services/member_service.dart';
-import '../../services/members.dart';
-import 'member_list_screen.dart';
+import 'package:special_squad/services/member_service.dart';
 
 class GuarantorInfoScreen extends StatefulWidget {
   final Map<String, dynamic> memberData;
   final File? photoFile; // ✅ ADD THIS
 
-  const GuarantorInfoScreen({super.key, required this.memberData, this.photoFile});
+  const GuarantorInfoScreen({
+    super.key,
+    required this.memberData,
+    this.photoFile,
+  });
 
   @override
   State<GuarantorInfoScreen> createState() => _GuarantorInfoScreenState();
@@ -82,7 +82,7 @@ class _GuarantorInfoScreenState extends State<GuarantorInfoScreen> {
             const SizedBox(height: 24),
 
             // Emergency Contact Information
-SectionTitle(title:'Emergency Contact'),
+            SectionTitle(title: 'Emergency Contact'),
             const SizedBox(height: 8),
 
             _buildEmergencyContactForm(),
@@ -90,7 +90,7 @@ SectionTitle(title:'Emergency Contact'),
             const SizedBox(height: 24),
 
             // Next of Kin
-SectionTitle(title: 'Next of Kin',),
+            SectionTitle(title: 'Next of Kin'),
             const SizedBox(height: 8),
 
             _buildNextOfKinForm(),
@@ -392,27 +392,23 @@ SectionTitle(title: 'Next of Kin',),
 
       // GUARANTOR
       "guarantorFullName": guarantorNameController.text.trim(),
-      "guarantorRelationship":
-      guarantorRelationshipController.text.trim(),
+      "guarantorRelationship": guarantorRelationshipController.text.trim(),
       "guarantorTribe": guarantorTribeController.text.trim(),
-      "guarantorPhoneNumber":
-      guarantorPhoneController.text.trim(),
+      "guarantorPhoneNumber": guarantorPhoneController.text.trim(),
 
       // EMERGENCY CONTACT
       "emergencyFullName": emergencyNameController.text.trim(),
       "emergencyAddress": emergencyAddressController.text.trim(),
-      "emergencyPhoneNumber":
-      emergencyPhoneController.text.trim(),
+      "emergencyPhoneNumber": emergencyPhoneController.text.trim(),
 
       // NEXT OF KIN
       "nextOfKinFullName": nextOfKinNameController.text.trim(),
       "nextOfKinAddress": nextOfKinAddressController.text.trim(),
-      "nextOfKinPhoneNumber":
-      nextOfKinPhoneController.text.trim(),
+      "nextOfKinPhoneNumber": nextOfKinPhoneController.text.trim(),
     };
     print('✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅$payload');
     try {
-      final memberService = context.read<MemberServices>();
+      final memberService = context.read<MemberService>();
 
       await memberService.addMember(
         payload: payload,
@@ -434,9 +430,7 @@ SectionTitle(title: 'Next of Kin',),
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            e.toString().replaceAll('Exception:', '').trim(),
-          ),
+          content: Text(e.toString().replaceAll('Exception:', '').trim()),
           backgroundColor: Colors.red,
         ),
       );

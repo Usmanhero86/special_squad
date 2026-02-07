@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
+import 'package:special_squad/services/member_service.dart';
+import 'package:special_squad/services/location_service.dart';
 import '../../models/duty_member.dart';
-import '../../services/members.dart';
+import '../../models/location_location.dart';
 import '../members/member_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -17,24 +18,60 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<DutyMember> _allMembers = [];
   List<DutyMember> _filteredMembers = [];
+  List<Location> _locations = [];
+  List<String> _filterOptions = ['All'];
 
   bool _isLoading = true;
+  bool _isLoadingLocations = true;
   String _selectedFilter = 'All';
-
-  final List<String> _filterOptions = [
-    'All',
-    'HQ',
-    'Marte',
-    'Baga',
-    'Sabon gari',
-    'Mallum fatori',
-  ];
 
   @override
   void initState() {
     super.initState();
+    _loadLocations();
     _loadMembers();
     _searchController.addListener(_filterMembers);
+  }
+
+  Future<void> _loadLocations() async {
+    try {
+      final locationService = context.read<LocationService>();
+      final locations = await locationService.fetchLocations();
+
+      if (!mounted) return;
+
+      setState(() {
+        _locations = locations;
+        _filterOptions = ['All', ...locations.map((l) => l.name)];
+        _isLoadingLocations = false;
+      });
+
+      debugPrint('✅ LOCATIONS LOADED: ${locations.length}');
+    } catch (e) {
+      debugPrint('❌ LOCATION LOAD ERROR: $e');
+
+      if (mounted) {
+        setState(() {
+          _isLoadingLocations = false;
+          // Fallback to default locations if API fails
+          _filterOptions = [
+            'All',
+            'HQ',
+            'Marte',
+            'Baga',
+            'Sabon gari',
+            'Mallum fatori',
+          ];
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not load locations: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -45,7 +82,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _loadMembers() async {
     try {
-      final service = context.read<MemberServices>();
+      final service = context.read<MemberService>();
       final members = await service.getAllDutyMembers();
 
       if (!mounted) return;
@@ -71,8 +108,8 @@ class _SearchScreenState extends State<SearchScreen> {
       _filteredMembers = _allMembers.where((m) {
         final matchesSearch =
             m.fullName.toLowerCase().contains(query) ||
-                m.rifleNo.toLowerCase().contains(query) ||
-                m.position.toLowerCase().contains(query);
+            m.rifleNo.toLowerCase().contains(query) ||
+            m.position.toLowerCase().contains(query);
 
         final matchesFilter =
             _selectedFilter == 'All' || m.location == _selectedFilter;
@@ -85,10 +122,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Search Members'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Search Members'), centerTitle: true),
       body: Column(
         children: [
           _buildSearchAndFilter(),
@@ -118,25 +152,46 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _selectedFilter,
-            decoration: const InputDecoration(
-              labelText: 'Filter by location',
-              border: OutlineInputBorder(),
-            ),
-            items: _filterOptions
-                .map(
-                  (e) => DropdownMenuItem(
-                value: e,
-                child: Text(e),
-              ),
-            )
-                .toList(),
-            onChanged: (value) {
-              setState(() => _selectedFilter = value!);
-              _filterMembers();
-            },
-          ),
+          _isLoadingLocations
+              ? Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Loading locations...',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : DropdownButtonFormField<String>(
+                  initialValue: _selectedFilter,
+                  decoration: const InputDecoration(
+                    labelText: 'Filter by location',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _filterOptions
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedFilter = value!);
+                    _filterMembers();
+                  },
+                ),
         ],
       ),
     );
@@ -149,9 +204,7 @@ class _SearchScreenState extends State<SearchScreen> {
         final member = _filteredMembers[index];
 
         return ListTile(
-          leading: CircleAvatar(
-            child: Text(member.fullName[0].toUpperCase()),
-          ),
+          leading: CircleAvatar(child: Text(member.fullName[0].toUpperCase())),
           title: Text(member.fullName),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,10 +230,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildEmptyState() {
     return const Center(
-      child: Text(
-        'No members found',
-        style: TextStyle(fontSize: 16),
-      ),
+      child: Text('No members found', style: TextStyle(fontSize: 16)),
     );
   }
 }

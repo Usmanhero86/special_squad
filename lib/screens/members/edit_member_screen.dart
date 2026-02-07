@@ -57,9 +57,9 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
       try {
         await memberService.updateMember(updatedMember);
         if (mounted) {
-          Navigator.pop(context);
+          Navigator.pop(context, true); // Return true to indicate success
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Member updated successfully!'),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 2),
@@ -336,8 +336,8 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('Cancel'),
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
                     ),
                   ),
                   SizedBox(width: 16),

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/getPayment.dart';
-import '../models/payment.dart';
 
 class PaymentApiService {
   final String baseUrl;

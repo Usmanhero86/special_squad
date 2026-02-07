@@ -11,24 +11,35 @@ class ApiClient {
   /// GET
   /// ======================
   Future<http.Response> get(String path) async {
-    return _send(
-      method: 'GET',
-      path: path,
-    );
+    return _send(method: 'GET', path: path);
   }
 
   /// ======================
   /// POST
   /// ======================
-  Future<http.Response> post(
-      String path, {
-        Object? body,
-      }) async {
-    return _send(
-      method: 'POST',
-      path: path,
-      body: body,
-    );
+  Future<http.Response> post(String path, {Object? body}) async {
+    return _send(method: 'POST', path: path, body: body);
+  }
+
+  /// ======================
+  /// PATCH
+  /// ======================
+  Future<http.Response> patch(String path, {Object? body}) async {
+    return _send(method: 'PATCH', path: path, body: body);
+  }
+
+  /// ======================
+  /// PUT
+  /// ======================
+  Future<http.Response> put(String path, {Object? body}) async {
+    return _send(method: 'PUT', path: path, body: body);
+  }
+
+  /// ======================
+  /// DELETE
+  /// ======================
+  Future<http.Response> delete(String path) async {
+    return _send(method: 'DELETE', path: path);
   }
 
   /// ======================
@@ -78,7 +89,7 @@ class ApiClient {
     required String path,
     Object? body,
     String? accessToken,
-  }) {
+  }) async {
     final uri = Uri.parse('$baseUrl$path');
 
     final headers = <String, String>{
@@ -86,20 +97,87 @@ class ApiClient {
       if (accessToken != null) 'Authorization': 'Bearer $accessToken',
     };
 
-    switch (method) {
-      case 'POST':
-        return http.post(
-          uri,
-          headers: headers,
-          body: body != null ? jsonEncode(body) : null,
-        );
+    try {
+      switch (method) {
+        case 'POST':
+          return await http
+              .post(
+                uri,
+                headers: headers,
+                body: body != null ? jsonEncode(body) : null,
+              )
+              .timeout(
+                const Duration(seconds: 30),
+                onTimeout: () {
+                  throw Exception(
+                    'Request timeout. Please check your internet connection.',
+                  );
+                },
+              );
 
-      case 'GET':
-      default:
-        return http.get(
-          uri,
-          headers: headers,
-        );
+        case 'PATCH':
+          return await http
+              .patch(
+                uri,
+                headers: headers,
+                body: body != null ? jsonEncode(body) : null,
+              )
+              .timeout(
+                const Duration(seconds: 30),
+                onTimeout: () {
+                  throw Exception(
+                    'Request timeout. Please check your internet connection.',
+                  );
+                },
+              );
+
+        case 'PUT':
+          return await http
+              .put(
+                uri,
+                headers: headers,
+                body: body != null ? jsonEncode(body) : null,
+              )
+              .timeout(
+                const Duration(seconds: 30),
+                onTimeout: () {
+                  throw Exception(
+                    'Request timeout. Please check your internet connection.',
+                  );
+                },
+              );
+
+        case 'DELETE':
+          return await http
+              .delete(uri, headers: headers)
+              .timeout(
+                const Duration(seconds: 30),
+                onTimeout: () {
+                  throw Exception(
+                    'Request timeout. Please check your internet connection.',
+                  );
+                },
+              );
+
+        case 'GET':
+        default:
+          return await http
+              .get(uri, headers: headers)
+              .timeout(
+                const Duration(seconds: 30),
+                onTimeout: () {
+                  throw Exception(
+                    'Request timeout. Please check your internet connection.',
+                  );
+                },
+              );
+      }
+    } catch (e) {
+      print('🔥 API REQUEST ERROR: $e');
+      print('🔗 URL: $uri');
+      print('📤 Headers: $headers');
+      if (body != null) print('📤 Body: ${jsonEncode(body)}');
+      rethrow;
     }
   }
 
