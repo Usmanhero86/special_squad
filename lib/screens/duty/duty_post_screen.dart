@@ -197,6 +197,10 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
                 );
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Add'),
           ),
         ],
