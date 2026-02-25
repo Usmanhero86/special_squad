@@ -406,6 +406,10 @@ class _GuarantorInfoScreenState extends State<GuarantorInfoScreen> {
       "nextOfKinAddress": nextOfKinAddressController.text.trim(),
       "nextOfKinPhoneNumber": nextOfKinPhoneController.text.trim(),
     };
+
+    // ✅ Remove null values to prevent backend errors
+    payload.removeWhere((key, value) => value == null);
+
     print('✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅$payload');
     try {
       final memberService = context.read<MemberService>();
