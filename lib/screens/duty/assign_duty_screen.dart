@@ -56,11 +56,20 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
     try {
       debugPrint('🟡 LOAD DUTY ASSIGNMENT DATA');
 
-      // 1️⃣ FETCH DUTY MEMBERS
-      final dutyMembers = await memberService.getDutyMembers();
+      // 1️⃣ TRY DUTY MEMBERS ENDPOINT FIRST
+      var dutyMembers = await memberService.getDutyMembers();
       debugPrint('✅ DUTY MEMBERS FETCHED: ${dutyMembers.length}');
 
-      // 2️⃣ FETCH DUTY POSTS — DATE IS REQUIRED ✅
+      // 2️⃣ FALLBACK: If duty members endpoint returns empty, use regular members endpoint
+      if (dutyMembers.isEmpty) {
+        debugPrint(
+          '⚠️ Duty members endpoint returned empty, trying regular members endpoint...',
+        );
+        dutyMembers = await memberService.getMembers(page: 1, limit: 100);
+        debugPrint('✅ REGULAR MEMBERS FETCHED: ${dutyMembers.length}');
+      }
+
+      // 3️⃣ FETCH DUTY POSTS — DATE IS REQUIRED ✅
       final List<DutyPost> posts = await dutyService.getDutyPosts(
         page: 1,
         limit: 100,
@@ -69,11 +78,14 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
 
       debugPrint('✅ DUTY POSTS FETCHED: ${posts.length}');
 
-      // 3️⃣ FILTER HQ MEMBERS
+      // 4️⃣ FILTER HQ MEMBERS
       final hqMembers = dutyMembers.where((m) {
         final location = m.location?.toLowerCase() ?? '';
+        debugPrint('🔍 Member: ${m.fullName}, Location: ${m.location}');
         return location.contains('hq');
       }).toList();
+
+      debugPrint('✅ HQ MEMBERS FILTERED: ${hqMembers.length}');
 
       if (!mounted) return;
 
@@ -335,7 +347,10 @@ class _AssignDutyScreenState extends State<AssignDutyScreen> {
             backgroundColor: Colors.blue,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          child: const Text('Assign Duty', style: TextStyle(color: Colors.white),),
+          child: const Text(
+            'Assign Duty',
+            style: TextStyle(color: Colors.white),
+          ),
         ),
       ),
     );

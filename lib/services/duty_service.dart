@@ -59,6 +59,40 @@ class DutyService {
     }
 
     final List list = data['responseBody']['data'] ?? [];
+
+    // If no posts found for this date, try fetching all posts without date filter
+    if (list.isEmpty) {
+      debugPrint(
+        '⚠️ No duty posts for date $formattedDate, fetching all posts...',
+      );
+      return await getAllDutyPosts(page: page, limit: limit);
+    }
+
+    return list.map((e) => DutyPost.fromJson(e)).toList();
+  }
+
+  /// ===============================
+  /// GET ALL DUTY POSTS (WITHOUT DATE FILTER)
+  /// ===============================
+  Future<List<DutyPost>> getAllDutyPosts({int page = 1, int limit = 10}) async {
+    final endpoint = '/api/v1/admin/duty?page=$page&limit=$limit';
+
+    debugPrint('🟡 FETCH ALL DUTY POSTS (NO DATE FILTER)');
+    debugPrint('📍 FULL URL: ${api.baseUrl}$endpoint');
+
+    final response = await api.get(endpoint);
+
+    debugPrint('📥 STATUS: ${response.statusCode}');
+    debugPrint('📥 BODY: ${response.body}');
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 200 || data['responseSuccessful'] != true) {
+      throw Exception(data['responseMessage'] ?? 'Failed to fetch duty posts');
+    }
+
+    final List list = data['responseBody']['data'] ?? [];
+    debugPrint('✅ ALL DUTY POSTS FETCHED: ${list.length}');
     return list.map((e) => DutyPost.fromJson(e)).toList();
   }
 
