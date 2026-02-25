@@ -360,6 +360,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                   DropdownButtonFormField<String>(
                     value: selectedMaritalStatus,
                     hint: const Text('Select marital status'),
+                    isExpanded: true,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4.0),
