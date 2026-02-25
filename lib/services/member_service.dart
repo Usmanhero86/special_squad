@@ -176,7 +176,17 @@ class MemberService {
   Future<List<Members>> getDutyMembers() async {
     if (api == null) throw Exception('API client not available');
 
-    final response = await api!.get('/api/v1/admin/duty/members');
+    debugPrint('🟡 FETCHING DUTY MEMBERS FROM API');
+    debugPrint(
+      '📍 URL: ${api!.baseUrl}/api/v1/admin/duty/members?page=1&limit=100',
+    );
+
+    final response = await api!.get(
+      '/api/v1/admin/duty/members?page=1&limit=100',
+    );
+
+    debugPrint('📥 DUTY MEMBERS STATUS: ${response.statusCode}');
+    debugPrint('📥 DUTY MEMBERS BODY: ${response.body}');
 
     final data = jsonDecode(response.body);
 
@@ -187,6 +197,13 @@ class MemberService {
     }
 
     final List list = data['responseBody']['data'];
+    debugPrint('📊 DUTY MEMBERS COUNT: ${list.length}');
+    debugPrint('📊 TOTAL MEMBERS: ${data['responseBody']['total']}');
+
+    if (list.isNotEmpty) {
+      debugPrint('📊 FIRST MEMBER DATA: ${list.first}');
+    }
+
     return list.map((e) => Members.fromJson(e)).toList();
   }
 

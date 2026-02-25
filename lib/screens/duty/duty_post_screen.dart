@@ -502,11 +502,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
     );
   }
 
-  Future<void> _updateDutyPost(
-    DutyPost post,
-    String name,
-    String description,
-  ) async {
+  Future<void> _updateDutyPost(DutyPost post,String name,String description) async {
     try {
       // Show loading indicator
       showDialog(
