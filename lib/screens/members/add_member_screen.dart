@@ -663,16 +663,22 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       return;
     }
 
-    // Helper function to return null for empty strings
-    String? _nullIfEmpty(String value) {
+    // Helper function to return a unique placeholder for empty optional fields
+    // This is a workaround for backend bug that checks rifleNo even when not provided
+    String? _handleOptionalField(String value) {
       final trimmed = value.trim();
-      return trimmed.isEmpty ? null : trimmed;
+      if (trimmed.isEmpty) {
+        // Don't send the field at all
+        return null;
+      }
+      return trimmed;
     }
 
     final memberData = {
       "fullName": fullNameController.text.trim(),
       "idNo": idNoController.text.trim(),
-      "rifleNo": _nullIfEmpty(rifleNoController.text),
+      if (_handleOptionalField(rifleNoController.text) != null)
+        "rifleNo": _handleOptionalField(rifleNoController.text),
       "tribe": tribeController.text.trim(),
       "religion": religionController.text.trim(),
       "dateOfBirth": DateTime(
@@ -689,10 +695,13 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       "permanentAddress": addressController.text.trim(),
       "maritalStatus": maritalController.text.trim(),
       "position": positionController.text.trim(),
-      "ninNo": _nullIfEmpty(ninController.text),
-      "bvn": _nullIfEmpty(bvnController.text),
+      if (_handleOptionalField(ninController.text) != null)
+        "ninNo": _handleOptionalField(ninController.text),
+      if (_handleOptionalField(bvnController.text) != null)
+        "bvn": _handleOptionalField(bvnController.text),
       "state": stateController.text.trim(),
-      "accountNo": _nullIfEmpty(accountController.text),
+      if (_handleOptionalField(accountController.text) != null)
+        "accountNo": _handleOptionalField(accountController.text),
       "unitArea": unitAreaController.text.trim(),
       "unitAreaType": selectedUnitAreaType,
     };
