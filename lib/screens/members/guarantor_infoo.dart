@@ -45,8 +45,8 @@ class _GuarantorInfoScreenState extends State<GuarantorInfoScreen> {
   // Selected values
   String? selectedGCOSpecialSquad;
   final List<String> gcoSpecialSquadOptions = [
-    'General Commanding Officer',
-    'Special Squad',
+    'General Officer Commanding',
+    'Secretary',
   ];
 
   @override
@@ -99,7 +99,7 @@ class _GuarantorInfoScreenState extends State<GuarantorInfoScreen> {
 
             // GCO/Special Squad Selection
             _buildSectionHeader(
-              'General Commanding Officer / Special Squad',
+              'General Officer Commanding / Secretary',
               null,
             ),
 
