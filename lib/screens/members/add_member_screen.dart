@@ -381,6 +381,10 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                         child: Text('Divorced'),
                       ),
                       DropdownMenuItem(value: 'Widow', child: Text('Widow')),
+                      DropdownMenuItem(
+                        value: 'Widower',
+                        child: Text('Widower'),
+                      ),
                     ],
                     onChanged: (value) {
                       setState(() {
