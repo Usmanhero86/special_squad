@@ -663,10 +663,16 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       return;
     }
 
+    // Helper function to return null for empty strings
+    String? _nullIfEmpty(String value) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
     final memberData = {
       "fullName": fullNameController.text.trim(),
       "idNo": idNoController.text.trim(),
-      "rifleNo": rifleNoController.text.trim(),
+      "rifleNo": _nullIfEmpty(rifleNoController.text),
       "tribe": tribeController.text.trim(),
       "religion": religionController.text.trim(),
       "dateOfBirth": DateTime(
@@ -683,10 +689,10 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       "permanentAddress": addressController.text.trim(),
       "maritalStatus": maritalController.text.trim(),
       "position": positionController.text.trim(),
-      "ninNo": ninController.text.trim(),
-      "bvn": bvnController.text.trim(),
+      "ninNo": _nullIfEmpty(ninController.text),
+      "bvn": _nullIfEmpty(bvnController.text),
       "state": stateController.text.trim(),
-      "accountNo": accountController.text.trim(),
+      "accountNo": _nullIfEmpty(accountController.text),
       "unitArea": unitAreaController.text.trim(),
       "unitAreaType": selectedUnitAreaType,
     };
