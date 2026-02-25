@@ -25,7 +25,6 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController locationController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
-  final TextEditingController maritalController = TextEditingController();
   final TextEditingController positionController = TextEditingController();
   final TextEditingController ninController = TextEditingController();
   final TextEditingController bvnController = TextEditingController();
@@ -35,6 +34,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
 
   // Selected values
   String? selectedGender;
+  String? selectedMaritalStatus;
   String? selectedUnitAreaType;
 
   Location? _selectedLocation;
@@ -357,9 +357,36 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                 children: [
                   _buildLabel('Marital Status'),
                   const SizedBox(height: 4),
-                  TextFormField(
-                    controller: maritalController,
-                    decoration: _inputDecoration('Enter marital status'),
+                  DropdownButtonFormField<String>(
+                    value: selectedMaritalStatus,
+                    hint: const Text('Select marital status'),
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4.0),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 16,
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Single', child: Text('Single')),
+                      DropdownMenuItem(
+                        value: 'Married',
+                        child: Text('Married'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Divorced',
+                        child: Text('Divorced'),
+                      ),
+                      DropdownMenuItem(value: 'Widow', child: Text('Widow')),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        selectedMaritalStatus = value;
+                      });
+                    },
                   ),
                 ],
               ),
@@ -652,6 +679,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
         phoneController.text.trim().isEmpty ||
         selectedDob == null ||
         selectedGender == null ||
+        selectedMaritalStatus == null ||
         selectedUnitAreaType == null ||
         _selectedLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -693,7 +721,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       "location": _selectedLocation!.id,
       "gender": selectedGender,
       "permanentAddress": addressController.text.trim(),
-      "maritalStatus": maritalController.text.trim(),
+      "maritalStatus": selectedMaritalStatus,
       "position": positionController.text.trim(),
       if (_handleOptionalField(ninController.text) != null)
         "ninNo": _handleOptionalField(ninController.text),
