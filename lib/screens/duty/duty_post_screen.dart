@@ -393,6 +393,10 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _showAddDutyPostDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Add First Duty Post'),
             ),
           ],
