@@ -143,9 +143,17 @@ class MemberService {
   Future<List<Members>> getMembers({int page = 1, int limit = 10}) async {
     if (api == null) throw Exception('API client not available');
 
+    debugPrint('🟡 FETCHING MEMBERS');
+    debugPrint(
+      '📍 URL: ${api!.baseUrl}/api/v1/admin/member?page=$page&limit=$limit',
+    );
+
     final response = await api!.get(
       '/api/v1/admin/member?page=$page&limit=$limit',
     );
+
+    debugPrint('📥 MEMBERS STATUS: ${response.statusCode}');
+    debugPrint('📥 MEMBERS BODY: ${response.body}');
 
     final data = jsonDecode(response.body);
 
@@ -154,7 +162,20 @@ class MemberService {
     }
 
     final List list = data['responseBody']['data'];
-    return list.map((e) => Members.fromJson(e)).toList();
+    debugPrint('📊 MEMBERS COUNT: ${list.length}');
+
+    if (list.isNotEmpty) {
+      debugPrint('📊 FIRST MEMBER: ${list.first}');
+    }
+
+    try {
+      return list.map((e) => Members.fromJson(e)).toList();
+    } catch (e, stackTrace) {
+      debugPrint('❌ ERROR PARSING MEMBERS: $e');
+      debugPrint('📊 STACK TRACE: $stackTrace');
+      debugPrint('📊 PROBLEMATIC DATA: $list');
+      rethrow;
+    }
   }
 
   /// GET MEMBER BY ID

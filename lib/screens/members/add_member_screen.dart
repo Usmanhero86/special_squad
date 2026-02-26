@@ -358,7 +358,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                   _buildLabel('Marital Status'),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
-                    value: selectedMaritalStatus,
+                    initialValue: selectedMaritalStatus,
                     hint: const Text('Select marital status'),
                     isExpanded: true,
                     decoration: InputDecoration(
@@ -698,7 +698,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
 
     // Helper function to return a unique placeholder for empty optional fields
     // This is a workaround for backend bug that checks rifleNo even when not provided
-    String? _handleOptionalField(String value) {
+    String? handleOptionalField(String value) {
       final trimmed = value.trim();
       if (trimmed.isEmpty) {
         // Don't send the field at all
@@ -710,8 +710,8 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     final memberData = {
       "fullName": fullNameController.text.trim(),
       "idNo": idNoController.text.trim(),
-      if (_handleOptionalField(rifleNoController.text) != null)
-        "rifleNo": _handleOptionalField(rifleNoController.text),
+      if (handleOptionalField(rifleNoController.text) != null)
+        "rifleNo": handleOptionalField(rifleNoController.text),
       "tribe": tribeController.text.trim(),
       "religion": religionController.text.trim(),
       "dateOfBirth": DateTime(
@@ -728,13 +728,13 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
       "permanentAddress": addressController.text.trim(),
       "maritalStatus": selectedMaritalStatus,
       "position": positionController.text.trim(),
-      if (_handleOptionalField(ninController.text) != null)
-        "ninNo": _handleOptionalField(ninController.text),
-      if (_handleOptionalField(bvnController.text) != null)
-        "bvn": _handleOptionalField(bvnController.text),
+      if (handleOptionalField(ninController.text) != null)
+        "ninNo": handleOptionalField(ninController.text),
+      if (handleOptionalField(bvnController.text) != null)
+        "bvn": handleOptionalField(bvnController.text),
       "state": stateController.text.trim(),
-      if (_handleOptionalField(accountController.text) != null)
-        "accountNo": _handleOptionalField(accountController.text),
+      if (handleOptionalField(accountController.text) != null)
+        "accountNo": handleOptionalField(accountController.text),
       "unitArea": unitAreaController.text.trim(),
       "unitAreaType": selectedUnitAreaType,
     };

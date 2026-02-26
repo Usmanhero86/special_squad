@@ -21,12 +21,12 @@ class Members {
 
   factory Members.fromJson(Map<String, dynamic> json) {
     return Members(
-      id: json['id'],
-      fullName: json['fullName'],
-      rifleNo: json['rifleNo'],
-      position: json['position'],
-      status: json['status'],
-      location: json['location'], // 🔥 THIS WAS MISSING OR WRONG
+      id: json['id'] ?? '',
+      fullName: json['fullName'] ?? 'Unknown',
+      rifleNo: json['rifleNo'] ?? '',
+      position: json['position'] ?? 'Member',
+      status: json['status'] ?? 'ACTIVE',
+      location: json['location'],
       photo: json['photo'],
     );
   }
