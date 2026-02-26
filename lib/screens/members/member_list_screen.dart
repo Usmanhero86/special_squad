@@ -31,7 +31,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
   }
 
   final int _page = 1;
-  final int _limit = 10;
+  final int _limit = 100; // Increased to show more members
   MemberOverview? _overview;
 
   @override
