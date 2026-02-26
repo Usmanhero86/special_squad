@@ -60,6 +60,11 @@ class PaymentDetailsSheet extends StatelessWidget {
               SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white
+
+                  ),
                   onPressed: _printReceipt,
                   icon: Icon(Icons.print),
                   label: Text('Print Receipt'),

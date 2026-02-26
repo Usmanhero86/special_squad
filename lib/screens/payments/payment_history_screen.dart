@@ -101,8 +101,8 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     WidgetsBinding.instance.addObserver(this);
     _selectedLocation = _locations.first;
 
-    _loadPaymentRecords(); 
-    _loadPaymentHistory(); 
+    _loadPaymentRecords();
+    _loadPaymentHistory();
 
     _searchController.addListener(_filterHistory);
   }
@@ -418,6 +418,14 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
               onSelected: (value) {
                 if (value == 'view') {
                   _showPaymentDetailsById(record.id);
+                } else if (value == 'mark_paid') {
+                  _markPaymentAsPaid(record.id);
+                } else if (value == 'mark_unpaid') {
+                  _markPaymentAsUnpaid(record.id);
+                } else if (value == 'edit') {
+                  _editPayment(record);
+                } else if (value == 'delete') {
+                  _showDeleteConfirmation(record);
                 }
               },
             ),
@@ -942,6 +950,309 @@ class PaymentHistoryScreenState extends State<PaymentHistoryScreen>
       );
     }
   }
+
+  // Mark payment as paid
+  Future<void> _markPaymentAsPaid(String paymentId) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final paymentService = Provider.of<PaymentService>(
+        context,
+        listen: false,
+      );
+
+      await paymentService.updatePaymentStatus(paymentId, 'COMPLETED');
+
+      if (!mounted) return;
+
+      // Close loading indicator
+      Navigator.of(context).pop();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment marked as paid successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Refresh the list
+      _loadPaymentRecords();
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close loading indicator
+      Navigator.of(context).pop();
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating payment: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Mark payment as unpaid
+  Future<void> _markPaymentAsUnpaid(String paymentId) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final paymentService = Provider.of<PaymentService>(
+        context,
+        listen: false,
+      );
+
+      await paymentService.updatePaymentStatus(paymentId, 'PENDING');
+
+      if (!mounted) return;
+
+      // Close loading indicator
+      Navigator.of(context).pop();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment marked as unpaid successfully'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+
+      // Refresh the list
+      _loadPaymentRecords();
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close loading indicator
+      Navigator.of(context).pop();
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating payment: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Edit payment
+  Future<void> _editPayment(Payments payment) async {
+    // TODO: Navigate to edit payment screen
+    // For now, show a message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Edit payment feature coming soon'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  // Show delete confirmation dialog
+  void _showDeleteConfirmation(Payments payment) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Payment'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Are you sure you want to delete this payment?'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      payment.memberName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Amount: ₦${payment.amount}'),
+                    Text('Status: ${payment.status}'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'This action cannot be undone.',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deletePayment(payment.id);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Delete payment
+  Future<void> _deletePayment(String paymentId) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Deleting payment...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      final paymentService = Provider.of<PaymentService>(
+        context,
+        listen: false,
+      );
+
+      await paymentService.deletePayment(paymentId);
+
+      if (!mounted) return;
+
+      // Close loading indicator
+      Navigator.of(context).pop();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment deleted successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      // Refresh the list
+      _loadPaymentRecords();
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close loading indicator
+      Navigator.of(context).pop();
+
+      // Parse error message
+      String errorMessage = e.toString();
+      if (errorMessage.contains('Exception:')) {
+        errorMessage = errorMessage.replaceFirst('Exception:', '').trim();
+      }
+
+      // Check if it's an endpoint not found error
+      final isEndpointError =
+          errorMessage.toLowerCase().contains('endpoint') ||
+          errorMessage.toLowerCase().contains('not found') ||
+          errorMessage.toLowerCase().contains('not support');
+
+      // Show detailed error dialog
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  isEndpointError ? Icons.warning : Icons.error,
+                  color: isEndpointError ? Colors.orange : Colors.red,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('Cannot Delete Payment')),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(errorMessage),
+                if (isEndpointError) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.blue.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Backend Issue:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'The delete payment API endpoint is not available on the backend. The backend team needs to implement:\n\n'
+                          'DELETE /api/v1/admin/payment/{paymentId}\n\n'
+                          'Until this is fixed, you cannot delete payments from the app.',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
 }
 
 // Helper class to combine payment and member data for history
@@ -1326,7 +1637,4 @@ class PaymentDetailSheet extends StatelessWidget {
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
-
-
-  
 }

@@ -401,8 +401,8 @@ class SettingsScreen extends StatelessWidget {
         title: const Text('Help & Support'),
         content: const Text(
           'For help and support, please contact:\n\n'
-          'Email: support@specialsquad.com\n'
-          'Phone: +234 123 456 7890\n\n'
+          'Email: alhajinfulani55@gmail.com\n'
+          'Phone: +234 8037761560\n\n'
           'We are available 24/7 to assist you.',
         ),
         actions: [

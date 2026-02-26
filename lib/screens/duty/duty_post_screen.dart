@@ -219,16 +219,7 @@ class _DutyPostScreenState extends State<DutyPostScreen> {
       appBar: AppBar(
         title: const Text('Duty Posts'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() {
-                _currentPage = 1;
-              });
-              _loadData();
-            },
-            tooltip: 'Refresh',
-          ),
+         
           IconButton(
             icon: const Icon(Icons.add_location_alt),
             onPressed: _showAddDutyPostDialog,

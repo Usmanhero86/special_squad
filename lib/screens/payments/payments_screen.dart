@@ -927,10 +927,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
 // Helper class to combine member and payment data
 class PaymentRecord {
-  final Member member;
-  Payment? payment;
-  final double amount;
-  String status;
+  final Member member;Payment? payment;final double amount;String status;
 
   PaymentRecord({
     required this.member,
@@ -1150,12 +1147,7 @@ class PaymentDetailSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-  ) {
+  Widget _buildDetailRow(BuildContext context,String label,String value,IconData icon,) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(

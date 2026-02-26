@@ -101,6 +101,10 @@ class AddPaymentScreenState extends State<AddPaymentScreen> {
                 onPressed: _savePayment,
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white
+
+                  
                 ),
                 child: Text('Save Payment'),
               ),

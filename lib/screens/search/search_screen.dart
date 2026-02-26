@@ -82,14 +82,35 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _loadMembers() async {
     try {
+      debugPrint('🟡 SEARCH SCREEN: LOADING MEMBERS');
+
       final service = context.read<MemberService>();
-      final members = await service.getAllDutyMembers();
+
+      // Use regular members endpoint instead of duty members
+      final regularMembers = await service.getMembers(page: 1, limit: 100);
+
+      debugPrint('✅ SEARCH SCREEN: MEMBERS LOADED: ${regularMembers.length}');
 
       if (!mounted) return;
 
+      // Convert Members to DutyMember for compatibility
+      final dutyMembers = regularMembers
+          .map(
+            (m) => DutyMember(
+              id: m.id,
+              fullName: m.fullName,
+              rifleNo: m.rifleNo,
+              position: m.position,
+              status: m.status,
+              location: m.location ?? 'Unknown',
+              photo: m.photo,
+            ),
+          )
+          .toList();
+
       setState(() {
-        _allMembers = members;
-        _filteredMembers = members;
+        _allMembers = dutyMembers;
+        _filteredMembers = dutyMembers;
         _isLoading = false;
       });
     } catch (e) {
@@ -97,6 +118,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
       if (mounted) {
         setState(() => _isLoading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load members: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }

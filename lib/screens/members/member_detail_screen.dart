@@ -154,6 +154,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                       '${member.dateOfBirth.toLocal().day.toString().padLeft(2, '0')}/${member.dateOfBirth.toLocal().month.toString().padLeft(2, '0')}/${member.dateOfBirth.toLocal().year}',
                     ),
                     _buildInfoRow('Position', member.position),
+                    _buildInfoRow('State', member.state),
                   ],
                 ),
 

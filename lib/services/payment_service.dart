@@ -257,4 +257,76 @@ class PaymentService {
       throw Exception(data['responseMessage'] ?? 'Failed to update payment');
     }
   }
+
+  /// ==============================
+  /// UPDATE PAYMENT STATUS
+  /// ==============================
+  Future<void> updatePaymentStatus(String paymentId, String status) async {
+    debugPrint('🟡 UPDATING PAYMENT STATUS: $paymentId');
+    debugPrint('📤 NEW STATUS: $status');
+
+    final response = await api.post(
+      '/api/v1/admin/payment/$paymentId',
+      body: {'paymentStatus': status},
+    );
+
+    debugPrint('📥 STATUS: ${response.statusCode}');
+    debugPrint('📥 BODY: ${response.body}');
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(
+        data['responseMessage'] ?? 'Failed to update payment status',
+      );
+    }
+
+    if (data['responseSuccessful'] != true) {
+      throw Exception(
+        data['responseMessage'] ?? 'Failed to update payment status',
+      );
+    }
+  }
+
+  /// ==============================
+  /// DELETE PAYMENT
+  /// ==============================
+  Future<void> deletePayment(String paymentId) async {
+    debugPrint('🟡 DELETING PAYMENT: $paymentId');
+
+    final response = await api.delete('/api/v1/admin/payment/$paymentId');
+
+    debugPrint('📥 DELETE STATUS: ${response.statusCode}');
+    debugPrint('📥 DELETE BODY: ${response.body}');
+
+    // Handle HTML error responses (like 404 pages)
+    if (response.body.trim().startsWith('<!DOCTYPE html>') ||
+        response.body.trim().startsWith('<html')) {
+      debugPrint('🔥 Server returned HTML error page instead of JSON');
+      debugPrint(
+        '🔥 This usually means the endpoint does not exist or method is not allowed',
+      );
+      throw Exception(
+        'Delete payment endpoint not found. The backend may not support payment deletion yet. Please contact the backend team to implement: DELETE /api/v1/admin/payment/{paymentId}',
+      );
+    }
+
+    // Some APIs return 204 No Content for successful deletion
+    if (response.statusCode == 204) {
+      debugPrint('✅ Payment deleted successfully (204 No Content)');
+      return;
+    }
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 200) {
+      throw Exception(data['responseMessage'] ?? 'Failed to delete payment');
+    }
+
+    if (data['responseSuccessful'] != true) {
+      throw Exception(data['responseMessage'] ?? 'Delete request failed');
+    }
+
+    debugPrint('✅ Payment deleted successfully');
+  }
 }

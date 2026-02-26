@@ -228,30 +228,65 @@ class MemberService {
     return list.map((e) => Members.fromJson(e)).toList();
   }
 
-  /// GET ALL DUTY MEMBERS
+  /// GET ALL DUTY MEMBERS (WITH FALLBACK)
   Future<List<DutyMember>> getAllDutyMembers() async {
     if (api == null) throw Exception('API client not available');
 
-    debugPrint('🟡 FETCHING DUTY MEMBERS');
+    debugPrint('🟡 FETCHING DUTY MEMBERS FOR SEARCH');
 
-    final response = await api!.get('/api/v1/admin/duty/members');
+    try {
+      // 1️⃣ TRY DUTY MEMBERS ENDPOINT FIRST
+      final response = await api!.get(
+        '/api/v1/admin/duty/members?page=1&limit=100',
+      );
 
-    debugPrint('📥 STATUS: ${response.statusCode}');
-    debugPrint('📥 BODY: ${response.body}');
+      debugPrint('📥 DUTY MEMBERS STATUS: ${response.statusCode}');
+      debugPrint('📥 DUTY MEMBERS BODY: ${response.body}');
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to fetch duty members');
+      if (response.statusCode != 200) {
+        throw Exception('Failed to fetch duty members');
+      }
+
+      final Map<String, dynamic> data = jsonDecode(response.body);
+
+      if (data['responseSuccessful'] != true) {
+        throw Exception(data['responseMessage'] ?? 'Request failed');
+      }
+
+      final List list = data['responseBody']['data'];
+      debugPrint('📊 DUTY MEMBERS COUNT: ${list.length}');
+
+      // 2️⃣ FALLBACK: If duty members endpoint returns empty, use regular members endpoint
+      if (list.isEmpty) {
+        debugPrint(
+          '⚠️ Duty members endpoint returned empty, trying regular members endpoint...',
+        );
+
+        final regularMembers = await getMembers(page: 1, limit: 100);
+        debugPrint('✅ REGULAR MEMBERS FETCHED: ${regularMembers.length}');
+
+        // Convert Members to DutyMember
+        return regularMembers
+            .map(
+              (m) => DutyMember(
+                id: m.id,
+                fullName: m.fullName,
+                rifleNo: m.rifleNo,
+                position: m.position,
+                status: m.status,
+                location: m.location ?? 'Unknown',
+                photo: m.photo,
+              ),
+            )
+            .toList();
+      }
+
+      // 3️⃣ Return duty members if not empty
+      return list.map((e) => DutyMember.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('❌ GET ALL DUTY MEMBERS ERROR: $e');
+      rethrow;
     }
-
-    final Map<String, dynamic> data = jsonDecode(response.body);
-
-    if (data['responseSuccessful'] != true) {
-      throw Exception(data['responseMessage'] ?? 'Request failed');
-    }
-
-    final List list = data['responseBody']['data'];
-
-    return list.map((e) => DutyMember.fromJson(e)).toList();
   }
 
   /// UPDATE MEMBER (API)
